@@ -42,7 +42,7 @@ function classification(
   };
 }
 
-Deno.test("defineRoleVocabulary rejette un rôle structurel absent de roles", () => {
+Deno.test("defineRoleVocabulary rejects a structural role missing from roles", () => {
   assertThrows(
     () =>
       defineRoleVocabulary({
@@ -54,7 +54,7 @@ Deno.test("defineRoleVocabulary rejette un rôle structurel absent de roles", ()
   );
 });
 
-Deno.test("defineRoleVocabulary rejette une préférence citant un rôle inconnu", () => {
+Deno.test("defineRoleVocabulary rejects a preference naming an unknown role", () => {
   assertThrows(
     () =>
       defineRoleVocabulary({
@@ -65,7 +65,7 @@ Deno.test("defineRoleVocabulary rejette une préférence citant un rôle inconnu
   );
 });
 
-Deno.test("defineRoleVocabulary dérive le bruit depuis la base", () => {
+Deno.test("defineRoleVocabulary derives the noise roles from the base set", () => {
   assertEquals([...vocabulary.noise].sort(), [
     "promo",
     "related-product",
@@ -73,7 +73,7 @@ Deno.test("defineRoleVocabulary dérive le bruit depuis la base", () => {
   ]);
 });
 
-Deno.test("selectProjectionContext filtre sur les rôles préférés", () => {
+Deno.test("selectProjectionContext filters on the preferred roles", () => {
   const artifacts = [artifact("a"), artifact("b")];
   const context = selectProjectionContext({
     projection: "specs",
@@ -91,7 +91,7 @@ Deno.test("selectProjectionContext filtre sur les rôles préférés", () => {
   assertEquals(context.fallbackReason, null);
 });
 
-Deno.test("selectProjectionContext retombe en contexte complet sans provider", () => {
+Deno.test("selectProjectionContext falls back to the full context with no provider", () => {
   const artifacts = [artifact("a", "html")];
   const context = selectProjectionContext({
     projection: "specs",
@@ -105,9 +105,9 @@ Deno.test("selectProjectionContext retombe en contexte complet sans provider", (
   assertEquals(context.stats.roles.html, 1);
 });
 
-Deno.test("selectProjectionContext retombe quand une projection n'a pas de préférence", () => {
+Deno.test("selectProjectionContext falls back when a projection has no preference", () => {
   const context = selectProjectionContext({
-    projection: "projection-inconnue",
+    projection: "unknown-projection",
     artifacts: [artifact("a")],
     classification: classification([{ id: "a", roles: ["datasheet"] }]),
     vocabulary,
@@ -117,7 +117,7 @@ Deno.test("selectProjectionContext retombe quand une projection n'a pas de préf
   assertEquals(context.artifacts.length, 1);
 });
 
-Deno.test("selectProjectionContext retombe quand le filtre ne laisse rien", () => {
+Deno.test("selectProjectionContext falls back when the filter leaves nothing", () => {
   const context = selectProjectionContext({
     projection: "specs",
     artifacts: [artifact("a")],
@@ -129,7 +129,7 @@ Deno.test("selectProjectionContext retombe quand le filtre ne laisse rien", () =
   assertEquals(context.artifacts.length, 1);
 });
 
-Deno.test("un artefact structurel échappe au filtre de bruit", () => {
+Deno.test("a structural artifact escapes the noise filter", () => {
   const context = selectProjectionContext({
     projection: "specs",
     artifacts: [artifact("a")],

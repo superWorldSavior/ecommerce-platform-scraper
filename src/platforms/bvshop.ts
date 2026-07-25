@@ -1,3 +1,31 @@
+/**
+ * BV SHOP platform adapter.
+ *
+ * Products live at `/item/<slug>`, and assets under
+ * `image.bvshop.tw/<storeId>/…` — note the store id in the path, which is why
+ * this engine's image hint and selector are built per store rather than being
+ * shared constants.
+ *
+ * ## The `item/query` companion endpoint
+ *
+ * The interesting part of this engine: alongside the HTML page at
+ * `/item/<slug>` there is a JSON endpoint at `/item/query/<slug>` returning the
+ * same product as structured data — description, photos, Q&A, style. Reading it
+ * is far more reliable than parsing the rendered page, so the flow is:
+ *
+ *  1. `resolveBvShopItemQueryUrlForProductUrl(productUrl)` derives the JSON URL.
+ *  2. Fetch the HTML page first, keep its cookies
+ *     (`bvShopCookieHeaderFromSetCookies`), then fetch the JSON with them — the
+ *     endpoint expects the session the page established.
+ *  3. `buildBvShopItemQueryArtifactJson()` narrows the payload to the fields
+ *     worth storing, and returns `null` when it holds nothing useful.
+ *
+ * The JSON is stored in the saved HTML inside a `<script>` tag marked with
+ * `BVSHOP_ITEM_QUERY_SCRIPT_ATTR`, so a single HTML artifact carries both the
+ * page and its structured companion. `extractBvShopItemQueryArtifactJson()`
+ * reads it back.
+ */
+
 import type {
   CatalogDiscoverySource,
   SourceModule,

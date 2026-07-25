@@ -17,7 +17,7 @@ const line = (text: string, confidence: number) => ({
   boundingBox: null,
 });
 
-Deno.test("confidenceFromAverage applique les seuils", () => {
+Deno.test("confidenceFromAverage applies the thresholds", () => {
   assertEquals(confidenceFromAverage(null), "LOW");
   assertEquals(confidenceFromAverage(0.9), "HIGH");
   assertEquals(confidenceFromAverage(0.82), "HIGH");
@@ -26,29 +26,29 @@ Deno.test("confidenceFromAverage applique les seuils", () => {
   assertEquals(confidenceFromAverage(0.2), "LOW");
 });
 
-Deno.test("confidenceFromAverage accepte des seuils personnalisés", () => {
+Deno.test("confidenceFromAverage accepts custom thresholds", () => {
   const strict = { high: 0.95, medium: 0.9 };
   assertEquals(confidenceFromAverage(0.92, strict), "MEDIUM");
   assertEquals(confidenceFromAverage(0.96, strict), "HIGH");
 });
 
-Deno.test("renderOcrLinesToMarkdown ignore les lignes vides", () => {
+Deno.test("renderOcrLinesToMarkdown skips blank lines", () => {
   assertEquals(
     renderOcrLinesToMarkdown([line("a", 1), line("   ", 1), line("b", 1)]),
     "a\nb",
   );
 });
 
-Deno.test("emptyOcrResult porte le nom du moteur et la raison", () => {
-  const result = emptyOcrResult("some-engine", "NO_TEXT", ["rien trouvé"]);
+Deno.test("emptyOcrResult carries the engine name and the reason", () => {
+  const result = emptyOcrResult("some-engine", "NO_TEXT", ["nothing found"]);
   assertEquals(result.diagnostics.provider, "some-engine");
   assertEquals(result.fallbackReason, "NO_TEXT");
   assertEquals(result.confidence, "LOW");
-  assertEquals(result.notes, "rien trouvé");
+  assertEquals(result.notes, "nothing found");
   assertEquals(result.ocrLayout, null);
 });
 
-Deno.test("parseAppleVisionOcrOutput transcrit une sortie valide", () => {
+Deno.test("parseAppleVisionOcrOutput transcribes a valid output", () => {
   const stdout = JSON.stringify({
     ok: true,
     provider: "apple-vision",
@@ -64,7 +64,7 @@ Deno.test("parseAppleVisionOcrOutput transcrit une sortie valide", () => {
   assertEquals(result.ocrLayout?.provider, APPLE_VISION_PROVIDER_NAME);
 });
 
-Deno.test("parseAppleVisionOcrOutput signale une erreur du moteur", () => {
+Deno.test("parseAppleVisionOcrOutput reports an engine error", () => {
   const stdout = JSON.stringify({
     ok: false,
     error: { code: "NO_IMAGE", message: "cannot decode" },
@@ -75,7 +75,7 @@ Deno.test("parseAppleVisionOcrOutput signale une erreur du moteur", () => {
   assertEquals(result.notes, "NO_IMAGE: cannot decode");
 });
 
-Deno.test("parseAppleVisionOcrOutput signale l'absence de texte", () => {
+Deno.test("parseAppleVisionOcrOutput reports that no text was found", () => {
   const stdout = JSON.stringify({
     ok: true,
     provider: "apple-vision",
@@ -85,7 +85,7 @@ Deno.test("parseAppleVisionOcrOutput signale l'absence de texte", () => {
   assertEquals(parseAppleVisionOcrOutput(stdout).fallbackReason, "NO_TEXT");
 });
 
-Deno.test("les contrôles qualité remontent dans notes et diagnostics", () => {
+Deno.test("quality checks surface in both notes and diagnostics", () => {
   const stdout = JSON.stringify({
     ok: true,
     provider: "apple-vision",
@@ -98,18 +98,18 @@ Deno.test("les contrôles qualité remontent dans notes et diagnostics", () => {
 
   assertEquals(result.diagnostics.warnings, ["suspect_黃耆_as_黄者"]);
   assertEquals(result.notes, "suspect_黃耆_as_黄者");
-  // Le texte source n'est jamais réécrit : c'est la preuve d'audit.
+  // The source text is never rewritten: it is the audit evidence.
   assertEquals(result.rawMarkdown, "黄者 萃取物");
 });
 
-Deno.test("le contrôle zh-TW reste muet sur un texte correct", () => {
+Deno.test("the zh-TW check stays quiet on correct text", () => {
   assertEquals(
     traditionalChineseOcrQualityCheck.run(["黃耆 萃取物", "維生素 C"]),
     [],
   );
 });
 
-Deno.test("runOcrQualityChecks agrège plusieurs contrôles", () => {
+Deno.test("runOcrQualityChecks aggregates several checks", () => {
   const always = { name: "always", run: () => ["flag"] };
   assertEquals(
     runOcrQualityChecks(["黃蓍"], [

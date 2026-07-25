@@ -1,16 +1,16 @@
 /**
- * Contrôles qualité OCR pour le chinois traditionnel (zh-Hant).
+ * OCR quality checks for Traditional Chinese (zh-Hant).
  *
- * Les moteurs OCR confondent certains caractères traditionnels avec un
- * homographe simplifié ou une variante voisine. Sur une étiquette produit, la
- * confusion tombe souvent sur un nom d'ingrédient — donc exactement sur
- * l'information qu'on cherchait à extraire, et sans faire chuter la confiance
- * du moteur : la forme reconnue est un caractère valide, simplement pas le bon.
+ * OCR engines confuse some traditional characters with a simplified homograph
+ * or a neighboring variant. On a product label the confusion usually lands on
+ * an ingredient name — so on exactly the information you were trying to
+ * extract, and without denting the engine's confidence: the shape it
+ * recognized is a valid character, just not the right one.
  *
- * Ces contrôles **signalent**, ils ne corrigent pas. Réécrire la transcription
- * détruirait la preuve source, seule base d'un audit ultérieur. L'appelant
- * décide quoi faire de l'avertissement — repasser la page en revue, la marquer
- * incomplète, ou tenter un autre moteur.
+ * These checks **flag**, they do not correct. Rewriting the transcription
+ * would destroy the source evidence, which is the only thing a later audit can
+ * rest on. The caller decides what to do with the warning — send the page back
+ * for review, mark it incomplete, or try another engine.
  *
  * ```ts
  * const provider = createAppleVisionOcrProvider({
@@ -22,11 +22,11 @@
 import type { OcrQualityCheck } from "../../kernel/ocr/provider.ts";
 
 /**
- * Confusions observées en production, forme attendue → formes erronées.
+ * Confusions observed in production, expected form → misread forms.
  *
- * Volontairement conservatrice : chaque entrée vient d'un cas constaté sur une
- * étiquette réelle. Un motif spéculatif produirait du bruit sur des pages
- * correctes, et un avertissement qu'on apprend à ignorer ne sert à rien.
+ * Deliberately conservative: every entry comes from a case seen on a real
+ * label. A speculative pattern would generate noise on pages that are fine,
+ * and a warning people learn to ignore is worth nothing.
  */
 export const TRADITIONAL_CHINESE_OCR_CONFUSIONS: ReadonlyArray<{
   readonly expected: string;
@@ -36,11 +36,11 @@ export const TRADITIONAL_CHINESE_OCR_CONFUSIONS: ReadonlyArray<{
 ];
 
 /**
- * Signale les confusions de caractères traditionnels connues.
+ * Flags known traditional character confusions.
  *
- * Les étiquettes retournées ont la forme `suspect_<attendu>_as_<lu>`, stables
- * et parsables — un consommateur peut les agréger par type de confusion pour
- * savoir quel caractère pose problème sur son corpus.
+ * The warnings it returns have the form `suspect_<expected>_as_<misread>`,
+ * stable and parsable — a consumer can aggregate them by confusion type to see
+ * which character is the troublesome one on its own corpus.
  */
 export const traditionalChineseOcrQualityCheck: OcrQualityCheck = {
   name: "zh-TW/traditional-chinese-confusions",

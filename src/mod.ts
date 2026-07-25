@@ -1,12 +1,12 @@
 /**
- * ecommerce-platform-scraper — scraper de sites e-commerce, organisé par
- * plateforme.
+ * ecommerce-platform-scraper — scraping toolkit for e-commerce storefronts,
+ * organised by platform.
  *
- * Point d'entrée unique. Les sous-modules restent importables directement si
- * seule une partie est nécessaire.
+ * Single entry point. Submodules stay directly importable when you only need a
+ * part of the toolkit.
  */
 
-// ── Contrat de source ────────────────────────────────────────────────────────
+// ── Source contract ─────────────────────────────────────────────────────────
 export type {
   CatalogDiscoverySource,
   DownloadPipelineFns,
@@ -29,7 +29,7 @@ export type {
 export { PIPELINE_PHASES } from "./kernel/phases.ts";
 export type { PipelinePhase } from "./kernel/phases.ts";
 
-// ── Plateformes ──────────────────────────────────────────────────────────────
+// ── Platforms ──────────────────────────────────────────────────────────────
 export {
   BVSHOP_COMMERCE_PLATFORM,
   type CommercePlatform,
@@ -69,13 +69,22 @@ export type {
 
 export {
   capCyberbizImageCandidateSelection,
+  CYBERBIZ_CDN_IMAGE_URL_HINT,
   CYBERBIZ_DEFAULT_MAX_SELECTED_IMAGES,
+  CYBERBIZ_PLATFORM_MODULE,
   cyberbizImageContextWindows,
   decideCyberbizContentImageByHtmlContext,
   decideCyberbizContentImageContext,
+  defineCyberbizSource,
+} from "./platforms/cyberbiz.ts";
+export type {
+  CyberbizCatalogDiscoverySpec,
+  CyberbizPlatformModule,
+  CyberbizSourceSpec,
+  DefinedCyberbizSource,
 } from "./platforms/cyberbiz.ts";
 
-// ── Découverte ───────────────────────────────────────────────────────────────
+// ── Discovery ───────────────────────────────────────────────────────────────
 export {
   CandidatesNotFoundError,
   inMemoryCandidateSource,
@@ -122,7 +131,7 @@ export type {
   RobotsRules,
 } from "./kernel/http/fetch.ts";
 
-// ── Stockage brut ────────────────────────────────────────────────────────────
+// ── Raw storage ────────────────────────────────────────────────────────────
 export {
   DEFAULT_RAW_ROOT,
   ProductHtmlNotFoundError,
@@ -169,7 +178,7 @@ export type {
   ImageMimeType,
 } from "./kernel/image-fetch.ts";
 
-// ── Contexte d'artefacts ─────────────────────────────────────────────────────
+// ── Artifact context ─────────────────────────────────────────────────────
 export {
   BASE_ARTIFACT_ROLES,
   BASE_NOISE_ROLES,

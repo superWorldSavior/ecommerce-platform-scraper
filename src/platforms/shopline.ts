@@ -1,3 +1,20 @@
+/**
+ * SHOPLINE platform adapter.
+ *
+ * The best-supported engine here, and the one with the widest reach: SHOPLINE
+ * serves merchants across Asia-Pacific and beyond, so an adapter written once
+ * pays off across many storefronts.
+ *
+ * Engine conventions this adapter encodes: products at `/products/<slug>`, a
+ * sitemap at the site root, and assets split across **two** CDNs — an older
+ * host for JSON-LD packshots and a newer one for body slides. A source that only
+ * serves one of them can narrow the hint with an override.
+ *
+ * Unlike the CYBERBIZ adapter, this one supplies a shared pre-OCR image
+ * selector: storefront markup is consistent enough across SHOPLINE stores for a
+ * single selector to make the same keep/drop calls.
+ */
+
 import type {
   CatalogDiscoverySource,
   SourceModule,
@@ -51,6 +68,10 @@ export type DefinedShoplineSource<TSpec extends ShoplineSourceSpec> =
     "catalogDiscovery" | "imageCandidateSelector" | "imageUrlHint"
   >;
 
+/**
+ * Composes SHOPLINE engine defaults with a source's own declaration.
+ * Overrides always win over defaults.
+ */
 export function defineShoplineSource<const TSpec extends ShoplineSourceSpec>(
   spec: TSpec,
 ): DefinedShoplineSource<TSpec> {
@@ -61,7 +82,7 @@ export function defineShoplineSource<const TSpec extends ShoplineSourceSpec>(
     ...source
   } = spec;
 
-  const definedBrand = {
+  const definedSource = {
     ...source,
     commercePlatform: SHOPLINE_PLATFORM_MODULE.commercePlatform,
     imageUrlHint: imageUrlHint ?? SHOPLINE_PLATFORM_MODULE.imageUrlHint,
@@ -71,7 +92,7 @@ export function defineShoplineSource<const TSpec extends ShoplineSourceSpec>(
     catalogDiscovery: shoplineCatalogDiscoveryFor(spec),
   } satisfies SourceModule;
 
-  return definedBrand as DefinedShoplineSource<TSpec>;
+  return definedSource as DefinedShoplineSource<TSpec>;
 }
 
 function shoplineCatalogDiscoveryFor(

@@ -1,5 +1,7 @@
 # ecommerce-platform-scraper
 
+**English** · [简体中文](README.zh-Hans.md) · [繁體中文](README.zh-Hant.md)
+
 Scraping toolkit for e-commerce storefronts, organised **by platform**.
 
 Most storefronts don't run on bespoke code — they run on a commerce SaaS. Sites
@@ -78,18 +80,20 @@ if (!isDisallowed(rules, "/products/")) {
 
 ## Platform support
 
-| Platform     | What ships                                                                                         | Maturity                                                                                                        |
-| ------------ | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **SHOPLINE** | `defineShoplineSource()` — full source factory with engine defaults                                | Best supported. Widest reach by far: SHOPLINE serves hundreds of thousands of merchants across APAC and beyond. |
-| **BV SHOP**  | `defineBvShopSource()` — full source factory, plus `item/query` URL resolution and cookie handling | Solid, but a small Taiwan-only platform. Niche unless you scrape there.                                         |
-| **CYBERBIZ** | Image-context helpers only — no source factory yet                                                 | Deliberate. Two sites is not enough evidence to design the factory; see below.                                  |
+| Platform     | What ships                                                                                    | Maturity                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **SHOPLINE** | `defineShoplineSource()` — engine defaults including a shared pre-OCR image selector          | Best supported. Widest reach by far: SHOPLINE serves merchants across APAC and beyond. |
+| **BV SHOP**  | `defineBvShopSource()`, plus the `item/query` JSON companion endpoint and its cookie handling | Solid, but a small Taiwan-only platform. Niche unless you scrape there.                |
+| **CYBERBIZ** | `defineCyberbizSource()`, plus markup-context image classification                            | Good. Image selection is deliberately left to each source — see below.                 |
 
-**On the missing CYBERBIZ factory.** It is not an oversight. Extracting a
-platform factory from two examples produces either something too loose to help
-or something wrong the moment a third site shows its real differences. The bar
-used here: at least three sites on the engine, at least two non-trivial shared
-capabilities expressible as declarative config, and duplication that cannot be
-modelled without branching on the site name. CYBERBIZ currently sits below it.
+**Why CYBERBIZ does not default the image selector.** On this engine, page
+bodies come out of a rich-text editor, and stores differ widely in how much
+marketing imagery they push into it. No single keep/drop rule holds across
+stores, so `imageCandidateSelector` stays required and each source composes its
+own from the helpers in the module. Supplying a default would paper over a real
+difference between storefronts, which is worse than asking the caller to decide.
+SHOPLINE markup is uniform enough that the same question has one shared answer,
+which is why its factory _does_ default it.
 
 ## Architecture
 
@@ -142,8 +146,6 @@ Stated plainly, because they'll be the first things you hit.
 - **Rate limiting is fixed-interval.** No jitter, no exponential backoff, and
   `Retry-After` is not honoured. Fine against sites that don't throttle; harden
   it before pointing this at one that answers 429.
-- **Code comments are in French.** The API, README and identifiers are English;
-  inline documentation is not, yet. Translation PRs welcome.
 
 ## Scope
 

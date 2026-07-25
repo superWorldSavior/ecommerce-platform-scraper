@@ -20,8 +20,19 @@
  */
 
 import { parseArgs } from "@std/cli/parse-args";
+import { dirname } from "@std/path/dirname";
 import { PoliteFetcher } from "../kernel/http/fetch.ts";
-import { observePage, renderReport, scaffoldFlags } from "./inspect-page.ts";
+import {
+  observePage,
+  type PageObservations,
+  renderReport,
+  scaffoldFlags,
+  scaffoldSpecFromObservations,
+} from "./inspect-page.ts";
+import {
+  renderSourceModule,
+  ScaffoldSpecError,
+} from "./render-source-module.ts";
 
 const HELP = `Inspect a product page and report what it contains.
 
@@ -32,6 +43,11 @@ Options
   --url <url>       The page's URL, when reading from --file.
   --user-agent <s>  Override the User-Agent. Please set a real one.
   --json            Emit JSON instead of a report.
+  --scaffold        Generate the skeleton directly. Needs --name.
+  --name <slug>     Source identifier, for --scaffold.
+  --out <path>      Write the skeleton here instead of stdout.
+  --import <spec>   Module specifier the skeleton imports from.
+  --force           Overwrite an existing --out file.
   --help            Show this.
 
 Observations only. Confirm them against a second page before committing a hint.
@@ -48,12 +64,77 @@ async function loadHtml(
   return await fetcher.fetchText(args.url);
 }
 
+/**
+ * Hands the observations straight to the renderer, so the whole path from a URL
+ * to a compiling skeleton is one command. The printed flags remain for when you
+ * want to review or adjust them first.
+ */
+async function emitScaffold(
+  obs: PageObservations,
+  options: {
+    name: string;
+    out?: string;
+    importSpecifier?: string;
+    force: boolean;
+  },
+): Promise<number> {
+  const spec = scaffoldSpecFromObservations(obs, {
+    name: options.name,
+    ...(options.importSpecifier === undefined
+      ? {}
+      : { importSpecifier: options.importSpecifier }),
+  });
+
+  if (spec === null) {
+    console.error(
+      "error: the observations do not support a skeleton. A custom storefront needs at least one image host, and none was seen on this page.",
+    );
+    return 1;
+  }
+
+  let contents: string;
+  try {
+    contents = renderSourceModule(spec);
+  } catch (error) {
+    if (error instanceof ScaffoldSpecError) {
+      console.error(`error: ${error.message}`);
+      return 1;
+    }
+    throw error;
+  }
+
+  if (options.out === undefined) {
+    console.log(contents);
+    return 0;
+  }
+
+  if (!options.force) {
+    const exists = await Deno.stat(options.out).then(() => true).catch(() =>
+      false
+    );
+    if (exists) {
+      console.error(
+        `error: ${options.out} already exists. Pass --force to overwrite it.`,
+      );
+      return 1;
+    }
+  }
+
+  await Deno.mkdir(dirname(options.out), { recursive: true });
+  await Deno.writeTextFile(options.out, contents);
+  console.error(`Wrote ${options.out}`);
+  console.error(
+    "Next: `deno task primitives` to see what else you can reuse, then fill in the parser.",
+  );
+  return 0;
+}
+
 export async function main(argv: readonly string[]): Promise<number> {
   const parsed = parseArgs([...argv], {
-    string: ["file", "url", "user-agent"],
-    boolean: ["json", "help"],
-    default: { json: false, help: false },
-    alias: { h: "help" },
+    string: ["file", "url", "user-agent", "name", "out", "import"],
+    boolean: ["json", "scaffold", "force", "help"],
+    default: { json: false, scaffold: false, force: false, help: false },
+    alias: { h: "help", o: "out" },
   });
 
   if (parsed.help) {
@@ -92,6 +173,23 @@ export async function main(argv: readonly string[]): Promise<number> {
   }
 
   const observations = observePage(url, html);
+
+  if (parsed.scaffold) {
+    if (parsed.name === undefined) {
+      console.error(
+        "error: --scaffold needs --name. The identifier is yours to choose; it cannot be read off the page.",
+      );
+      return 1;
+    }
+    return await emitScaffold(observations, {
+      name: parsed.name,
+      force: parsed.force,
+      ...(parsed.out === undefined ? {} : { out: parsed.out }),
+      ...(parsed.import === undefined
+        ? {}
+        : { importSpecifier: parsed.import }),
+    });
+  }
 
   if (parsed.json) {
     console.log(JSON.stringify(observations, null, 2));

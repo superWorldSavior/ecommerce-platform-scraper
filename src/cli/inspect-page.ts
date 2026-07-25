@@ -11,6 +11,7 @@
  */
 
 import { PRIMITIVE_CATALOGUE } from "./primitive-catalogue.ts";
+import type { ScaffoldSpec } from "./render-source-module.ts";
 
 export interface DetectedPlatform {
   readonly kind: "shopline" | "cyberbiz" | "bvshop" | "custom";
@@ -258,6 +259,46 @@ export function renderReport(obs: PageObservations): string {
   );
 
   return lines.join("\n");
+}
+
+/**
+ * Turns observations into a scaffold spec, so `inspect --scaffold` can hand
+ * straight over without a copy-paste in between.
+ *
+ * `name` cannot be observed — it is the identifier *you* choose for the source,
+ * and guessing it from a hostname would produce something you rename
+ * immediately. Everything else comes from the page.
+ *
+ * Returns `null` when the observations do not support a spec: a custom
+ * storefront with no image host seen has no `imageUrlHint` to build, and
+ * emitting one anyway would be a fabrication.
+ */
+export function scaffoldSpecFromObservations(
+  obs: PageObservations,
+  options: { readonly name: string; readonly importSpecifier?: string },
+): ScaffoldSpec | null {
+  const host = hostOf(obs.url);
+  if (host === null) return null;
+
+  const isCustom = obs.platform.kind === "custom";
+  const cdnHost = obs.imageHosts[0]?.host;
+  if (isCustom && cdnHost === undefined) return null;
+
+  return {
+    name: options.name,
+    rawHost: host,
+    siteUrl: `https://${host}`,
+    platform: obs.platform.kind,
+    productPathSegment: obs.productPathSegment ?? "products",
+    // Observing one page says nothing about whether a sitemap exists. Assume it
+    // does — the cheap error is a discovery config you delete, not a catalog you
+    // never knew you could enumerate.
+    catalogDiscovery: true,
+    ...(options.importSpecifier === undefined
+      ? {}
+      : { importSpecifier: options.importSpecifier }),
+    ...(isCustom ? { imageCdnHost: cdnHost, customLabel: options.name } : {}),
+  } as ScaffoldSpec;
 }
 
 /** Scaffold flags implied by the observations, ready to paste. */

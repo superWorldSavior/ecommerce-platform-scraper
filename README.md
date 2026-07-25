@@ -120,6 +120,19 @@ is what makes the answer worth trusting.
 
 ### 3. Generate the skeleton
 
+If you trust what step 1 found, skip the copy-paste — `inspect` hands over
+directly:
+
+```
+deno task inspect <url> --scaffold --name example --out sources/example/mod.ts
+```
+
+One command from a URL to a skeleton that compiles. `--name` is the one thing it
+will not invent: the identifier is yours to choose, and guessing it from a
+hostname produces something you rename immediately.
+
+Otherwise, run the scaffold on its own:
+
 `deno task scaffold` asks a handful of questions and writes a `SourceModule`
 skeleton — every field present, each one annotated with the primitive that
 belongs there.

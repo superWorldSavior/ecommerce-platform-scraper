@@ -3,9 +3,11 @@ import {
   observePage,
   renderReport,
   scaffoldFlags,
+  scaffoldSpecFromObservations,
   suggestedPrimitives,
   suggestedSourceMethod,
 } from "../src/cli/inspect-page.ts";
+import { renderSourceModule } from "../src/cli/render-source-module.ts";
 
 const PRODUCT_URL = "https://shop.example.test/products/thing";
 
@@ -228,4 +230,66 @@ Deno.test("the report states its own limits", () => {
 
   assertStringIncludes(report, "Observations only");
   assertStringIncludes(report, "one page is not a pattern");
+});
+
+Deno.test("observations become a scaffold spec, name excepted", () => {
+  const obs = observePage(
+    PRODUCT_URL,
+    page(`<img src="https://shoplineimg.com/a/1.jpg">`, productJsonLd),
+  );
+
+  const spec = scaffoldSpecFromObservations(obs, { name: "chosen" });
+
+  assertEquals(spec?.name, "chosen");
+  assertEquals(spec?.rawHost, "shop.example.test");
+  assertEquals(spec?.platform, "shopline");
+  assertEquals(spec?.productPathSegment, "products");
+});
+
+Deno.test("a custom spec takes its CDN from the busiest observed host", () => {
+  const obs = observePage(
+    PRODUCT_URL,
+    page(`
+      <img src="https://cdn.bespoke.test/1.jpg">
+      <img src="https://cdn.bespoke.test/2.jpg">
+      <img src="https://other.test/3.jpg">
+    `),
+  );
+
+  const spec = scaffoldSpecFromObservations(obs, { name: "bespoke" });
+
+  assertEquals(spec?.platform, "custom");
+  assertEquals(spec?.imageCdnHost, "cdn.bespoke.test");
+});
+
+Deno.test("a custom page with no image host yields no spec at all", () => {
+  // There is no imageUrlHint to build, and inventing one would be a
+  // fabrication. Refusing is the honest outcome.
+  const obs = observePage(PRODUCT_URL, page(""));
+
+  assertEquals(scaffoldSpecFromObservations(obs, { name: "x" }), null);
+});
+
+Deno.test("a known engine needs no image host to yield a spec", () => {
+  // The factory already knows the engine's CDN, so an image-less page is not a
+  // blocker here — unlike the custom case.
+  const obs = observePage(
+    "https://shop.example.test/item/thing",
+    page(`<img src="https://image.bvshop.tw/9/product/a.jpg">`),
+  );
+
+  assertEquals(
+    scaffoldSpecFromObservations(obs, { name: "x" })?.platform,
+    "bvshop",
+  );
+});
+
+Deno.test("the derived spec renders a skeleton that the renderer accepts", () => {
+  const obs = observePage(
+    PRODUCT_URL,
+    page(`<img src="https://cdn.bespoke.test/1.jpg">`),
+  );
+  const spec = scaffoldSpecFromObservations(obs, { name: "bespoke" });
+
+  assertEquals(typeof renderSourceModule(spec!), "string");
 });

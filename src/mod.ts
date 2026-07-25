@@ -51,12 +51,15 @@ export type {
 } from "./platforms/shopline.ts";
 
 export {
+  appendBvShopItemQueryArtifact,
+  buildBvShopItemQueryArtifactJson,
   BVSHOP_ITEM_QUERY_SCRIPT_ATTR,
   BVSHOP_PLATFORM_MODULE,
   bvShopCookieHeaderFromSetCookies,
   bvShopItemQueryUrlForProductUrl,
   defineBvShopSource,
   extractBvShopItemSlugFromUrl,
+  hasUsableBvShopItemQueryArtifact,
   resolveBvShopItemQueryUrlForProductUrl,
 } from "./platforms/bvshop.ts";
 export type {

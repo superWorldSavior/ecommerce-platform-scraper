@@ -1,10 +1,13 @@
 /**
  * Declarative contract of a scraped source.
  *
- * Each site exposes one `SourceModule` instance. A registry aggregates them,
- * and the pipeline phases consume the capabilities declared here. The module is
- * **data**, not behavior: it describes what the site can do, and the generic
- * runners decide what to do with that.
+ * Each site exposes one `SourceModule` instance. The module is **data**, not
+ * behaviour: it describes what a site can do, and your driver code decides what
+ * to do with that.
+ *
+ * The package ships this contract and the primitives underneath it, not the
+ * loop that walks them. Aggregating modules into a registry and sequencing the
+ * phases is yours to write — that part is where every project differs.
  *
  * Before writing an adapter, check whether the site runs on a known engine:
  * `platforms/shopline`, `platforms/cyberbiz` and `platforms/bvshop` assemble

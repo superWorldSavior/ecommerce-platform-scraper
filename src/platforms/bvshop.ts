@@ -20,10 +20,11 @@
  *  3. `buildBvShopItemQueryArtifactJson()` narrows the payload to the fields
  *     worth storing, and returns `null` when it holds nothing useful.
  *
- * The JSON is stored in the saved HTML inside a `<script>` tag marked with
- * `BVSHOP_ITEM_QUERY_SCRIPT_ATTR`, so a single HTML artifact carries both the
- * page and its structured companion. `extractBvShopItemQueryArtifactJson()`
- * reads it back.
+ *  4. `appendBvShopItemQueryArtifact()` stores it in the saved HTML, inside a
+ *     `<script>` tag marked with `BVSHOP_ITEM_QUERY_SCRIPT_ATTR`, so one HTML
+ *     artifact carries both the page and its structured companion.
+ *     `hasUsableBvShopItemQueryArtifact()` reports whether a stored page has
+ *     one worth reading.
  */
 
 import type {

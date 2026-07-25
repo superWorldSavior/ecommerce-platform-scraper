@@ -14,6 +14,9 @@
 
 import type { CommercePlatformKind } from "../kernel/commerce-platform.ts";
 
+/** Specifier the generated file imports from, unless overridden. */
+export const DEFAULT_IMPORT_SPECIFIER = "jsr:@casys/ecommerce-platform-scraper";
+
 export interface ScaffoldSpec {
   /** Lowercase ASCII identifier, the source's key across the pipeline. */
   readonly name: string;
@@ -33,6 +36,12 @@ export interface ScaffoldSpec {
   readonly productPathSegment: string;
   /** Whether the site exposes an enumerable catalog via sitemap. */
   readonly catalogDiscovery: boolean;
+  /**
+   * Store identifier, required by BV SHOP: its asset paths are
+   * `image.bvshop.tw/<storeId>/…`, so the engine cannot build an image hint
+   * or a selector without it.
+   */
+  readonly storeId?: string;
   /** Module specifier the generated file imports the toolkit from. */
   readonly importSpecifier: string;
 }
@@ -73,6 +82,11 @@ export function assertScaffoldSpec(spec: ScaffoldSpec): void {
   if (!PATH_SEGMENT_RE.test(spec.productPathSegment)) {
     throw new ScaffoldSpecError(
       `Invalid productPathSegment "${spec.productPathSegment}". Expected a URL path segment, e.g. "products".`,
+    );
+  }
+  if (spec.platform === "bvshop" && !spec.storeId) {
+    throw new ScaffoldSpecError(
+      "A BV SHOP source needs storeId: the engine derives its image hint and selector from it, and the skeleton will not compile without one. Find it in an asset URL: image.bvshop.tw/<storeId>/...",
     );
   }
   if (spec.platform === "custom" && !spec.imageCdnHost) {
@@ -141,6 +155,7 @@ export const source = ${factory.fn}({
   name: "${spec.name}",
   rawHost: "${spec.rawHost}",
   productUrlRegex: PRODUCT_URL_RE,
+${spec.storeId === undefined ? "" : `  storeId: "${spec.storeId}",\n`}
 
   // Pre-OCR image selection. \`null\` keeps every candidate image — a fine
   // starting point. Narrow it once you see what the pages actually serve.

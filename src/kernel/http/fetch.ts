@@ -64,7 +64,12 @@ export class PoliteFetcher {
   readonly acceptLanguage: string;
   readonly minIntervalMs: number;
   readonly timeoutMs: number;
-  private lastCallByHost: Map<string, number> = new Map();
+  /**
+   * Next instant each host may be called. Reserved *before* awaiting, so
+   * concurrent callers queue instead of all reading the same free slot and
+   * firing together.
+   */
+  private nextFreeByHost: Map<string, number> = new Map();
 
   constructor(options: PoliteFetcherOptions = {}) {
     this.userAgent = options.userAgent ?? DEFAULT_UA;
@@ -144,15 +149,23 @@ export class PoliteFetcher {
     }
   }
 
+  /**
+   * Claim the next slot for this host.
+   *
+   * The reservation is written synchronously, before any `await`. That
+   * ordering is the whole mechanism: a version that read the last call time,
+   * slept, then recorded the new one let every caller that arrived during the
+   * sleep compute the same deadline and fire simultaneously — so
+   * `Promise.all` over a host's sub-sitemaps ignored the limit entirely.
+   */
   private async waitForSlot(url: string): Promise<void> {
     const host = hostOf(url);
-    const last = this.lastCallByHost.get(host) ?? 0;
     const now = Date.now();
-    const wait = last + this.minIntervalMs - now;
-    if (wait > 0) {
-      await sleep(wait);
-    }
-    this.lastCallByHost.set(host, Date.now());
+    const slot = Math.max(now, this.nextFreeByHost.get(host) ?? 0);
+
+    this.nextFreeByHost.set(host, slot + this.minIntervalMs);
+
+    if (slot > now) await sleep(slot - now);
   }
 }
 
@@ -165,66 +178,122 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Parse `robots.txt` and return disallow rules applicable to `User-agent: *`.
+ * Parse `robots.txt` and return the rules that apply to `User-agent: *`.
  *
- * Makes no claim to be a complete robots parser: it ignores inline wildcards
- * other than a trailing `*`, `Crawl-delay` directives, and agent-specific
- * User-agent sections. Enough to keep track of the paths we must NOT crawl,
- * and to fail fast when a sitemap hands us a disallowed URL.
+ * Handles grouped agent records: consecutive `User-agent` lines form one group
+ * sharing the rules that follow (RFC 9309 §2.2.1), so a group naming `*`
+ * alongside a named bot still yields its rules. A previous version reset the
+ * match on every agent line, which silently dropped those rules.
+ *
+ * **Fails closed on what it cannot express.** `Crawl-delay` is ignored, and a
+ * pattern using an inner `*` or a terminal `$` is kept as an
+ * `unsupported` entry rather than being reduced to a prefix — reducing
+ * `Disallow: /*.json$` to the prefix `/` would either block everything or,
+ * as it previously did, silently allow `/cart.json`. `isDisallowed` treats an
+ * unsupported pattern as disallowing, because answering "allowed" for a path
+ * the site forbade is the one error this function must not make.
  */
 export interface RobotsRules {
   disallow: string[];
   allow: string[];
   sitemaps: string[];
+  /** Disallow patterns too expressive for prefix matching. Treated as blocking. */
+  unsupported: string[];
+}
+
+/** A pattern this parser cannot reduce to a prefix without changing its meaning. */
+function isUnsupportedPattern(value: string): boolean {
+  return value.slice(0, -1).includes("*") || value.endsWith("$");
 }
 
 export function parseRobotsTxt(text: string): RobotsRules {
-  const lines = text.split(/\r?\n/);
-  const rules: RobotsRules = { disallow: [], allow: [], sitemaps: [] };
-  let inWildcard = false;
-  for (const line of lines) {
-    const trimmed = line.replace(/#.*$/, "").trim();
+  const rules: RobotsRules = {
+    disallow: [],
+    allow: [],
+    sitemaps: [],
+    unsupported: [],
+  };
+
+  // A run of consecutive `User-agent` lines opens one group. The group stays
+  // open until a rule line is seen; the next agent line after that starts a
+  // new group.
+  let inWildcardGroup = false;
+  let collectingAgents = false;
+
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.replace(/#.*$/u, "").trim();
     if (!trimmed) continue;
-    const [rawKey, ...rest] = trimmed.split(":");
-    if (!rawKey || rest.length === 0) continue;
-    const key = rawKey.trim().toLowerCase();
-    const value = rest.join(":").trim();
+
+    const separator = trimmed.indexOf(":");
+    if (separator <= 0) continue;
+    const key = trimmed.slice(0, separator).trim().toLowerCase();
+    const value = trimmed.slice(separator + 1).trim();
 
     if (key === "user-agent") {
-      inWildcard = value === "*";
+      if (!collectingAgents) {
+        inWildcardGroup = false;
+        collectingAgents = true;
+      }
+      if (value === "*") inWildcardGroup = true;
       continue;
     }
+
+    // `Sitemap` is a non-group directive: it applies whatever the current
+    // agent group is.
     if (key === "sitemap") {
-      rules.sitemaps.push(value);
+      if (value) rules.sitemaps.push(value);
       continue;
     }
-    if (!inWildcard) continue;
-    if (key === "disallow" && value) rules.disallow.push(value);
-    if (key === "allow" && value) rules.allow.push(value);
+
+    collectingAgents = false;
+    if (!inWildcardGroup || !value) continue;
+
+    if (key === "disallow") {
+      (isUnsupportedPattern(value) ? rules.unsupported : rules.disallow)
+        .push(value);
+    }
+    if (key === "allow" && !isUnsupportedPattern(value)) {
+      rules.allow.push(value);
+    }
   }
+
   return rules;
 }
 
+/**
+ * Whether `path` is disallowed. Longest matching rule wins, `Allow` breaking
+ * ties in the crawler's favour, as the specification prescribes.
+ *
+ * Any `unsupported` pattern whose literal prefix matches is treated as
+ * disallowing: the parser could not express the rule faithfully, so this errs
+ * towards not fetching.
+ */
 export function isDisallowed(rules: RobotsRules, path: string): boolean {
-  const normalized = path.replace(/\*+/g, "");
-  let deny = false;
   let longestDeny = 0;
   let longestAllow = 0;
-  for (const rule of rules.disallow) {
-    if (matchesRule(normalized, rule) && rule.length > longestDeny) {
+  let deny = false;
+
+  for (const rule of [...rules.disallow, ...rules.unsupported]) {
+    if (matchesRule(path, rule) && rule.length > longestDeny) {
       deny = true;
       longestDeny = rule.length;
     }
   }
   for (const rule of rules.allow) {
-    if (matchesRule(normalized, rule) && rule.length > longestAllow) {
+    if (matchesRule(path, rule) && rule.length > longestAllow) {
       longestAllow = rule.length;
     }
   }
+
   return deny && longestDeny > longestAllow;
 }
 
+/**
+ * Prefix match, with a trailing `*` meaning "and anything after". The path is
+ * never rewritten — an earlier version stripped `*` from the *path*, which
+ * matched rules the site never wrote.
+ */
 function matchesRule(path: string, rule: string): boolean {
-  const literal = rule.replace(/\*$/, "");
-  return path.startsWith(literal);
+  const literal = rule.endsWith("*") ? rule.slice(0, -1) : rule;
+  return path.startsWith(literal.split("*")[0]);
 }

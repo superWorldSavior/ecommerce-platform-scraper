@@ -142,7 +142,7 @@ easy to reimplement a piece of it by accident.
 | ------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Sitemap and catalog | `parseSitemapUrls`, `splitSitemap`, `fetchCatalogFromSitemap`                         | Nested sitemapindex handling, prefix and pattern filtering                         |
 | Raw HTML            | `readProductHtml`, `productHtmlPaths`                                                 | Snapshot path convention, fallback-path resolution, the `NotFound`-only retry rule |
-| Images, pre-OCR     | `buildImageCandidateSelection`, `imageCandidateUrlLookupVariants`                     | Drop accounting, URL spelling variants, deduplication                              |
+| Images, pre-OCR     | `buildImageCandidateSelection`                                                        | Drop accounting, URL spelling variants, deduplication                              |
 | Image fetch         | `fetchImageAsBase64`                                                                  | MIME detection from the response rather than the extension                         |
 | Artifact context    | `createPerArtifactContextProvider`, `selectProjectionContext`, `defineRoleVocabulary` | Fallback logic, role counting, noise filtering                                     |
 | OCR                 | `OcrProvider`, `confidenceFromAverage`, `runOcrQualityChecks`                         | Confidence banding, quality-check aggregation, typed empty results                 |

@@ -148,6 +148,21 @@ export const PRIMITIVE_CATALOGUE: readonly PrimitiveEntry[] = [
     summary: "Pull the product slug out of a BV SHOP item URL.",
   },
   {
+    symbol: "buildBvShopItemQueryArtifactJson",
+    axis: "platform",
+    summary: "Narrow a BV SHOP item/query payload to the fields worth storing.",
+  },
+  {
+    symbol: "appendBvShopItemQueryArtifact",
+    axis: "platform",
+    summary: "Embed the item/query JSON in the saved HTML, under a marker tag.",
+  },
+  {
+    symbol: "hasUsableBvShopItemQueryArtifact",
+    axis: "platform",
+    summary: "Report whether stored HTML carries a usable item/query payload.",
+  },
+  {
     symbol: "bvShopCookieHeaderFromSetCookies",
     axis: "platform",
     summary: "Build the Cookie header the BV SHOP JSON endpoint expects.",

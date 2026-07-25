@@ -97,8 +97,8 @@ export interface LlmClient {
  *  - `AUTH` / `MODEL_NOT_FOUND`: abort, this is a configuration problem.
  *  - `RATE_LIMITED`: wait `retryAfterSeconds`, then resubmit. Per-window
  *    endpoint quota — pausing is the caller's job.
- *  - `NETWORK` / `PROVIDER_ERROR`: transient, can be retried after a backoff.
- *    The client already retries internally with exponential backoff.
+ *  - `NETWORK` / `PROVIDER_ERROR`: transient, worth retrying.
+ *    The client already retries internally, at a fixed cadence.
  *  - `INVALID_OUTPUT`: the model produced JSON that failed to parse or to
  *    validate, after every retry. Not a network bug — either the prompt is
  *    wrong or the model is.
@@ -134,7 +134,7 @@ function requireEnv(key: string): string {
   if (!value) {
     throw new LlmClientError(
       "MISSING_ENV",
-      `Missing env var ${key}. Set it in .env (cf .env.example)`,
+      `Missing env var ${key}. Export it, or pass --env-file (see .env.example).`,
     );
   }
   return value;
@@ -538,7 +538,7 @@ export function createLlmClient(opts?: LlmClientOptions): LlmClient {
     // SDK retries are disabled (maxRetries: 0) so that extract() is the only
     // retry handler. That allows fine-grained control per error code
     // (RATE_LIMITED not retried, PROVIDER_ERROR retried with exponential
-    // backoff). Without the 0, the SDK would run its own retries on 429/5xx
+    // pacing). Without the 0, the SDK would run its own retries on 429/5xx
     // before throwing, hiding the intermediate responses from our
     // classification.
     maxRetries: 0,

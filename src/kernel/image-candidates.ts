@@ -13,7 +13,7 @@ export interface ImageCandidateSelectorInput {
   html: string;
   sourceName: string;
   quarter: string;
-  supplementSlug: string;
+  productId: string;
   imageUrls: readonly string[];
 }
 
@@ -44,7 +44,7 @@ export class ImageCandidateSelectionError extends Error {
   constructor(
     message: string,
     readonly context: {
-      supplementSlug: string;
+      productId: string;
       sourceName: string;
       url?: string;
     },
@@ -133,7 +133,7 @@ export function capImageCandidateSelection(
     throw new ImageCandidateSelectionError(
       "image candidate cap must be a positive integer",
       {
-        supplementSlug: "unknown",
+        productId: "unknown",
         sourceName: "unknown",
       },
     );
@@ -547,7 +547,7 @@ export function validateImageCandidateSelection(
       throw new ImageCandidateSelectionError(
         `image candidate selector left ${count} URL occurrence(s) unaccounted`,
         {
-          supplementSlug: input.supplementSlug,
+          productId: input.productId,
           sourceName: input.sourceName,
           url,
         },
@@ -592,7 +592,7 @@ function consumeUrl(
     throw new ImageCandidateSelectionError(
       `image candidate selector returned ${label} outside discovered image URLs`,
       {
-        supplementSlug: input.supplementSlug,
+        productId: input.productId,
         sourceName: input.sourceName,
         url,
       },

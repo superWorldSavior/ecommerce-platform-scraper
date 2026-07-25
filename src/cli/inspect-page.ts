@@ -11,7 +11,10 @@
  */
 
 import { PRIMITIVE_CATALOGUE } from "./primitive-catalogue.ts";
-import type { ScaffoldSpec } from "./render-source-module.ts";
+import {
+  DEFAULT_IMPORT_SPECIFIER,
+  type ScaffoldSpec,
+} from "./render-source-module.ts";
 
 export interface DetectedPlatform {
   readonly kind: "shopline" | "cyberbiz" | "bvshop" | "custom";
@@ -294,11 +297,9 @@ export function scaffoldSpecFromObservations(
     // does — the cheap error is a discovery config you delete, not a catalog you
     // never knew you could enumerate.
     catalogDiscovery: true,
-    ...(options.importSpecifier === undefined
-      ? {}
-      : { importSpecifier: options.importSpecifier }),
+    importSpecifier: options.importSpecifier ?? DEFAULT_IMPORT_SPECIFIER,
     ...(isCustom ? { imageCdnHost: cdnHost, customLabel: options.name } : {}),
-  } as ScaffoldSpec;
+  };
 }
 
 /** Scaffold flags implied by the observations, ready to paste. */

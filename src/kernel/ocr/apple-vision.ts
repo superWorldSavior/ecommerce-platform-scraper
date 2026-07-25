@@ -66,14 +66,60 @@ export interface AppleVisionOcrOptions {
   readonly binaryPath?: string;
 }
 
-const DEFAULT_BINARY_PATH = "/tmp/ecommerce-platform-scraper-apple-vision-ocr";
+/**
+ * Where the compiled helper is cached.
+ *
+ * Deliberately **not** a fixed path in a world-writable directory. The helper
+ * is executed directly, and the compile step is skipped whenever a file is
+ * already present and newer than the source — so a shared-machine attacker
+ * could pre-plant a binary at a predictable location and have it run with the
+ * victim's privileges (CWE-377). The cache therefore lives in a
+ * user-owned directory created with mode 0700, whose ownership and mode are
+ * re-checked before every execution.
+ */
+function defaultCacheDir(): string {
+  const home = Deno.env.get("HOME");
+  if (home === undefined || home.length === 0) {
+    throw new Error(
+      "Cannot locate a cache directory: HOME is unset. Pass `binaryPath` explicitly.",
+    );
+  }
+  return `${home}/.cache/ecommerce-platform-scraper`;
+}
+
+/**
+ * Refuse a cache directory that anyone else could write to. Returns the
+ * directory on success.
+ */
+async function ensureSafeCacheDir(dir: string): Promise<string> {
+  await Deno.mkdir(dir, { recursive: true, mode: 0o700 });
+
+  const info = await Deno.stat(dir);
+  // `uid`/`mode` are null on platforms that do not report them (Windows); the
+  // check is skipped there rather than failing on a system where it cannot
+  // apply. Apple Vision only runs on macOS anyway.
+  if (info.uid !== null && info.uid !== Deno.uid()) {
+    throw new Error(
+      `Refusing to use ${dir}: it is owned by another user (uid ${info.uid}).`,
+    );
+  }
+  if (info.mode !== null && (info.mode & 0o077) !== 0) {
+    throw new Error(
+      `Refusing to use ${dir}: mode ${
+        (info.mode & 0o777).toString(8)
+      } lets other users write to it. Run: chmod 700 ${dir}`,
+    );
+  }
+
+  return dir;
+}
 
 export function createAppleVisionOcrProvider(
   options: AppleVisionOcrOptions = {},
 ): OcrProvider {
   const qualityChecks = options.qualityChecks ?? [];
   const thresholds = options.thresholds ?? DEFAULT_OCR_CONFIDENCE_THRESHOLDS;
-  const binaryPath = options.binaryPath ?? DEFAULT_BINARY_PATH;
+  const binaryPath = options.binaryPath;
 
   return {
     name: APPLE_VISION_PROVIDER_NAME,
@@ -90,7 +136,17 @@ export function createAppleVisionOcrProvider(
         return fail("EMPTY_IMAGE", ["imageBase64 is empty"]);
       }
 
-      const helper = await ensureHelperBinary(binaryPath);
+      let helper: { ok: true; path: string } | { ok: false; error: string };
+      try {
+        helper = await ensureHelperBinary(
+          binaryPath ??
+            `${await ensureSafeCacheDir(defaultCacheDir())}/apple-vision-ocr`,
+        );
+      } catch (error) {
+        return fail("PROVIDER_UNAVAILABLE", [
+          error instanceof Error ? error.message : String(error),
+        ]);
+      }
       if (!helper.ok) return fail("PROVIDER_UNAVAILABLE", [helper.error]);
 
       const imagePath = await Deno.makeTempFile({

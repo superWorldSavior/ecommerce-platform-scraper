@@ -26,6 +26,7 @@
 import { parseArgs } from "@std/cli/parse-args";
 import { dirname } from "@std/path/dirname";
 import {
+  DEFAULT_IMPORT_SPECIFIER,
   renderSourceModule,
   type ScaffoldSpec,
   ScaffoldSpecError,
@@ -39,8 +40,6 @@ const PLATFORMS: readonly CommercePlatformKind[] = [
   "custom",
 ];
 
-const DEFAULT_IMPORT_SPECIFIER = "jsr:@casys/ecommerce-platform-scraper";
-
 interface Flags {
   name?: string;
   host?: string;
@@ -48,6 +47,7 @@ interface Flags {
   platform?: string;
   label?: string;
   cdn?: string;
+  storeId?: string;
   segment?: string;
   catalog?: boolean;
   import?: string;
@@ -68,6 +68,7 @@ Options
   --platform <kind>    ${PLATFORMS.join(" | ")}
   --label <text>       Engine label, custom only. Defaults to the name.
   --cdn <hostname>     Asset CDN host. Required for custom.
+  --store-id <id>      Store identifier. Required for bvshop.
   --segment <path>     Path before the product slug. Default: products
   --catalog / --no-catalog
                        Whether a sitemap catalog exists. Default: yes
@@ -147,6 +148,13 @@ export function collectSpec(flags: Flags): ScaffoldSpec {
       ? ask("Product path segment", defaultSegment)
       : defaultSegment);
 
+  const storeId = flags.storeId ??
+    (platform === "bvshop"
+      ? interactive
+        ? ask("Store id (from image.bvshop.tw/<storeId>/...)")
+        : requireFlag(flags.storeId, "store-id")
+      : undefined);
+
   const imageCdnHost = flags.cdn ??
     (isCustom
       ? interactive ? ask("Asset CDN host") : requireFlag(flags.cdn, "cdn")
@@ -167,6 +175,7 @@ export function collectSpec(flags: Flags): ScaffoldSpec {
     productPathSegment: segment,
     catalogDiscovery,
     importSpecifier: flags.import ?? DEFAULT_IMPORT_SPECIFIER,
+    ...(storeId === undefined ? {} : { storeId }),
     ...(imageCdnHost === undefined ? {} : { imageCdnHost }),
     ...(customLabel === undefined ? {} : { customLabel }),
   };
@@ -194,6 +203,7 @@ export async function main(argv: readonly string[]): Promise<number> {
       "platform",
       "label",
       "cdn",
+      "store-id",
       "segment",
       "import",
       "out",
@@ -214,6 +224,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     platform: parsed.platform,
     label: parsed.label,
     cdn: parsed.cdn,
+    storeId: parsed["store-id"],
     segment: parsed.segment,
     catalog: parsed.catalog,
     import: parsed.import,

@@ -59,7 +59,8 @@ export const source = defineShoplineSource({
   name: "example",
   rawHost: "shop.example.test",
   productUrlRegex: /^https:\/\/shop\.example\.test\/products\/([^/?#]+)/u,
-  imageCandidateSelector: null,
+  // imageCandidateSelector omitted on purpose: omitting it takes the engine
+  // default. Passing `null` would mean "deliberately no selection".
   projectionProviders: { artifactContext: null, structuredFacts: null },
   pipelineFns: { download: { siteUrl: "https://shop.example.test" } },
 });
@@ -230,9 +231,13 @@ OpenAI-compatible endpoint. What varies by deployment is injected, not assumed.
 
 ## Configuration
 
-Copy `.env.example`. Four variables are required — `LLM_API_KEY`,
-`LLM_BASE_URL`, `LLM_MODEL`, `LLM_VISION_MODEL` — and a missing one fails at
-startup rather than mid-run. `LLM_REQUEST_TIMEOUT_MS` is the only optional one.
+Copy `.env.example` to `.env`. Nothing loads it for you — pass `--env-file=.env`
+to `deno run`, or export the variables — because a library that silently reads a
+dotenv file surprises the process that embeds it.
+
+Four variables are required — `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`,
+`LLM_VISION_MODEL` — and a missing one fails at startup rather than mid-run.
+`LLM_REQUEST_TIMEOUT_MS` is the only optional one.
 
 **Local or hosted, same code.** `LLM_BASE_URL` points at any OpenAI-compatible
 API, so a local runtime (`http://localhost:11434/v1`), a self-hosted server, or

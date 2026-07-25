@@ -10,6 +10,10 @@ import {
   ScaffoldSpecError,
 } from "../src/cli/render-source-module.ts";
 import { collectSpec } from "../src/cli/scaffold.ts";
+import {
+  observePage,
+  scaffoldSpecFromObservations,
+} from "../src/cli/inspect-page.ts";
 
 const TOOLKIT = new URL("../src/mod.ts", import.meta.url).href;
 
@@ -51,6 +55,7 @@ Deno.test("cyberbiz and bvshop each get their own factory", () => {
       ...base,
       platform: "bvshop",
       productPathSegment: "item",
+      storeId: "42",
     }),
     "defineBvShopSource({",
   );
@@ -135,12 +140,14 @@ Deno.test("collectSpec defaults the BV SHOP path segment to item", () => {
     name: "example",
     host: "shop.example.test",
     platform: "bvshop",
+    storeId: "42",
     yes: true,
     force: false,
     help: false,
   });
 
   assertEquals(spec.productPathSegment, "item");
+  assertEquals(spec.storeId, "42");
 });
 
 Deno.test("collectSpec refuses an unknown engine", () => {
@@ -187,7 +194,10 @@ Deno.test({
         const [label, spec] of [["platform", base], ["custom", custom]] as const
       ) {
         const path = `${dir}/${label}.ts`;
-        await Deno.writeTextFile(path, renderSourceModule(spec));
+        await Deno.writeTextFile(
+          path,
+          renderSourceModule(spec as ScaffoldSpec),
+        );
         paths.push(path);
       }
 
@@ -207,4 +217,41 @@ Deno.test({
       await Deno.remove(dir, { recursive: true });
     }
   },
+});
+
+Deno.test("a BV SHOP source without a storeId is refused, not silently broken", () => {
+  // The engine derives its image hint and selector from the store id, so a
+  // skeleton without one does not compile. Refusing beats emitting it.
+  const error = assertThrows(
+    () => renderSourceModule({ ...base, platform: "bvshop" }),
+    ScaffoldSpecError,
+  );
+  assertStringIncludes(error.message, "storeId");
+});
+
+Deno.test("a BV SHOP skeleton carries the storeId through", () => {
+  const out = renderSourceModule({
+    ...base,
+    platform: "bvshop",
+    storeId: "42",
+  });
+
+  assertStringIncludes(out, 'storeId: "42"');
+});
+
+Deno.test("the import specifier is never left undefined", () => {
+  // Regression: the inspect handoff omitted it and emitted `from "undefined"`,
+  // producing a skeleton that could not resolve its own import.
+  const { importSpecifier: _dropped, ...withoutSpecifier } = base;
+  const spec = scaffoldSpecFromObservations(
+    observePage(
+      "https://shop.example.test/products/thing",
+      "<img src='https://shoplineimg.com/a/1.jpg'>",
+    ),
+    { name: "example" },
+  );
+
+  assertEquals(typeof spec?.importSpecifier, "string");
+  assertStringIncludes(renderSourceModule(spec!), 'from "jsr:@casys/');
+  assertEquals("importSpecifier" in withoutSpecifier, false);
 });

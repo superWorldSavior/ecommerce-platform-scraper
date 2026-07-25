@@ -1,28 +1,28 @@
 /**
- * Lecture du HTML brut stocké pour un produit.
+ * Reads the raw HTML stored for a product.
  *
- * Le stockage suit une convention `<rawRoot>/<rawHost>/<quarter>/products/`, où
- * `quarter` est l'étiquette d'instantané : le même produit rescrapé plus tard
- * cohabite avec sa version précédente au lieu de l'écraser. C'est ce qui permet
- * de rejouer une extraction sur d'anciennes pages après correction d'un parser,
- * sans refetch.
+ * Storage follows a `<rawRoot>/<rawHost>/<quarter>/products/` convention, where
+ * `quarter` is the snapshot label: the same product rescraped later sits next
+ * to its earlier version instead of overwriting it. That is what makes it
+ * possible to replay an extraction over old pages after fixing a parser, with
+ * no refetch.
  *
- * `rawRoot` et le constructeur de chemin sont paramétrables — la convention est
- * un défaut, pas une contrainte.
+ * `rawRoot` and the path builder are both configurable — the convention is a
+ * default, not a constraint.
  */
 
-/** Racine de stockage par défaut, relative au répertoire de travail. */
+/** Default storage root, relative to the working directory. */
 export const DEFAULT_RAW_ROOT = "data/raw";
 
 export interface ProductHtmlSourceConfig {
   readonly rawHost: string;
-  /** Racine de stockage. Défaut `DEFAULT_RAW_ROOT`. */
+  /** Storage root. Defaults to `DEFAULT_RAW_ROOT`. */
   readonly rawRoot?: string;
-  /** Remplace entièrement le constructeur de chemin principal. */
+  /** Replaces the primary path builder outright. */
   readonly htmlPathFor?: (productId: string, quarter: string) => string;
   /**
-   * Emplacements secondaires à essayer si le principal est absent. Utile pour
-   * les sites qui gardent une archive à côté du catalogue courant.
+   * Secondary locations to try when the primary one is missing. Useful for
+   * sites that keep an archive next to the current catalog.
    */
   readonly htmlFallbackPathsFor?: (
     productId: string,
@@ -33,7 +33,7 @@ export interface ProductHtmlSourceConfig {
 export interface ResolvedProductHtml {
   readonly html: string;
   readonly path: string;
-  /** Tous les chemins essayés, dans l'ordre. Utile au diagnostic. */
+  /** Every path that was tried, in order. Useful when diagnosing. */
   readonly attemptedPaths: readonly string[];
 }
 
@@ -58,7 +58,7 @@ export function productHtmlPath(
   return `${rawRoot}/${rawHost}/${quarter}/products/${productId}.html`;
 }
 
-/** Chemins à essayer, dédupliqués, principal d'abord. */
+/** Paths to try, deduplicated, primary one first. */
 export function productHtmlPaths(
   config: ProductHtmlSourceConfig,
   productId: string,
@@ -76,11 +76,11 @@ export function productHtmlPaths(
 }
 
 /**
- * Lit le premier HTML trouvé parmi les chemins candidats.
+ * Reads the first HTML found among the candidate paths.
  *
- * Seuls les `NotFound` font passer au chemin suivant : une erreur de permission
- * ou de disque est remontée telle quelle, parce que la traiter comme une absence
- * transformerait un problème d'environnement en « produit introuvable ».
+ * Only a `NotFound` moves on to the next path: a permission or disk error is
+ * rethrown as is, because treating it as an absence would turn an environment
+ * problem into "product not found".
  */
 export async function readProductHtml(
   config: ProductHtmlSourceConfig,

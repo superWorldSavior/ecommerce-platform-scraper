@@ -1,13 +1,13 @@
 /**
  * Extract `<loc>` URLs from a `sitemap.xml` payload.
  *
- * Tolérant : ne valide pas le schéma sitemap.org (pas de vérification du
- * namespace, pas de parsing `<lastmod>`), juste un match regex global
- * sur `<loc>...</loc>`. Suffisant pour les sitemaps observés (
- * Shopline) et robuste face aux wrappers XML variés.
+ * Deliberately lenient: it does not validate the sitemap.org schema (no
+ * namespace check, no `<lastmod>` parsing), just one global regex match on
+ * `<loc>...</loc>`. Enough for the sitemaps seen in the wild (SHOPLINE among
+ * them) and robust against the assorted XML wrappers around them.
  *
- * Gère les sitemapindex emboîtés : `collectIndexChildren(xml)` retourne
- * les URLs de sitemaps enfants qu'il faudra fetcher séparément.
+ * Handles nested sitemapindex documents: `collectIndexChildren(xml)` returns
+ * the child sitemap URLs that still have to be fetched separately.
  */
 
 export interface SitemapSplit {

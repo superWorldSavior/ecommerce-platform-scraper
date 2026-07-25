@@ -1,16 +1,16 @@
 /**
- * Catalog discovery via sitemap.xml — primitive agnostique de la source.
+ * Catalog discovery via sitemap.xml — a source-agnostic primitive.
  *
- * Fetch un sitemap (urlset OU sitemapindex), suit récursivement les
- * sitemap-index avec une profondeur bornée à 2 (un niveau d'index +
- * sub-sitemaps), et retourne les URLs produits qui matchent
- * `productUrlRegex` du BrandModule. Capacité consommée par
- * `SourceModule.catalogDiscovery` et réutilise les primitives sitemap.
+ * Fetches a sitemap (either urlset OR sitemapindex), follows sitemap-index
+ * entries recursively with the depth capped at 2 (one index level and its
+ * sub-sitemaps), and returns the product URLs matching the module's
+ * `productUrlRegex`. This is the capability consumed by
+ * `SourceModule.catalogDiscovery`, and it reuses the sitemap primitives.
  *
- * Politesse réseau : par défaut on passe par `PoliteFetcher` (UA identifié,
- * timeout 30 s, throttle 2 s/host) — singleton module pour que le rate-limit
- * s'applique aussi quand `Promise.all` lance plusieurs sub-sitemaps en
- * parallèle. Tests : passer `opts.fetcher` pour bypass.
+ * Network politeness: by default requests go through `PoliteFetcher`
+ * (identified UA, 30 s timeout, 2 s throttle per host) — a module-level
+ * singleton, so the rate limit still applies when `Promise.all` fires off
+ * several sub-sitemaps in parallel. Tests can pass `opts.fetcher` to bypass it.
  */
 
 import { PoliteFetcher } from "./http/fetch.ts";
@@ -19,9 +19,9 @@ import { splitSitemap } from "./sitemap.ts";
 const MAX_DEPTH = 2;
 
 export interface CatalogProductCandidate {
-  /** URL canonique de la fiche produit (telle qu'elle apparaît dans le sitemap). */
+  /** Canonical product page URL, exactly as it appears in the sitemap. */
   url: string;
-  /** Slug ASCII extrait via productUrlRegex.exec(url)[1]. URI-decoded. */
+  /** ASCII slug captured by productUrlRegex.exec(url)[1]. URI-decoded. */
   productId: string;
 }
 
@@ -32,11 +32,11 @@ const defaultFetcher: SitemapFetcher = (url) =>
   sharedPoliteFetcher.fetchText(url);
 
 /**
- * Fetch puis parse un sitemap pour produire la liste des URLs produits.
+ * Fetches then parses a sitemap to produce the list of product URLs.
  *
- * @throws si la profondeur de recursion depasse MAX_DEPTH, ou si une
- * requete HTTP echoue. Les URLs ne matchant pas productUrlRegex sont
- * silencieusement ignorees (pages categorie, blog, about, etc.).
+ * @throws if the recursion goes deeper than MAX_DEPTH, or if an HTTP request
+ * fails. URLs that do not match productUrlRegex are silently ignored
+ * (category pages, blog, about, etc.).
  */
 export function fetchCatalogFromSitemap(opts: {
   rootUrl: string;
@@ -112,10 +112,10 @@ function dedupeByUrl(
 }
 
 /**
- * Écarte les entrées dont le `productId` matche au moins un pattern de la
- * denylist (typiquement cosmétiques / skincare quand le site vend hors
- * compléments sous le même path `/products/`). No-op si la denylist est vide
- * ou absente.
+ * Drops the entries whose `productId` matches at least one denylist pattern —
+ * typically cosmetics or skincare, when a site sells more than supplements
+ * under the same `/products/` path. No-op when the denylist is empty or
+ * missing.
  */
 export function filterCatalogEntriesByDenylist(
   entries: readonly CatalogProductCandidate[],

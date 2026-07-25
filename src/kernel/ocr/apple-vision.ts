@@ -1,19 +1,19 @@
 /**
- * Moteur OCR Apple Vision — **macOS uniquement**.
+ * Apple Vision OCR engine — **macOS only**.
  *
- * Implémente `OcrProvider` en pilotant un petit helper Objective-C
- * (`native/apple-vision-ocr.m`), compilé à la demande via `clang` et mis en
- * cache entre les exécutions. Le helper renvoie les lignes reconnues avec leur
- * confiance et leur boîte englobante normalisée.
+ * Implements `OcrProvider` by driving a small Objective-C helper
+ * (`native/apple-vision-ocr.m`), compiled on demand with `clang` and cached
+ * between runs. The helper returns the recognized lines with their confidence
+ * and their normalized bounding box.
  *
- * Pourquoi Apple Vision : sur des étiquettes produit photographiées, il
- * préserve mieux les écritures CJK denses que les moteurs libres testés — en
- * particulier les caractères traditionnels rares. Sur un autre hôte,
- * `available()` renvoie `false` et l'appelant doit basculer sur un autre
- * moteur ; c'est à lui de composer sa chaîne de repli.
+ * Why Apple Vision: on photographed product labels it preserves dense CJK
+ * scripts better than the open-source engines we tried — rare traditional
+ * characters in particular. On any other host, `available()` returns `false`
+ * and the caller has to switch to another engine; composing the fallback chain
+ * is up to them.
  *
- * Prérequis : macOS avec les outils en ligne de commande Xcode (`clang` et les
- * frameworks Foundation / AppKit / Vision).
+ * Requirements: macOS with the Xcode command line tools (`clang` and the
+ * Foundation / AppKit / Vision frameworks).
  */
 
 import { decodeBase64 } from "@std/encoding/base64";
@@ -35,7 +35,7 @@ import {
 
 export const APPLE_VISION_PROVIDER_NAME = "apple-vision";
 
-/** Version du contrat de sortie du helper, à incrémenter s'il change. */
+/** Version of the helper's output contract; bump it whenever that changes. */
 export const APPLE_VISION_OUTPUT_VERSION = "image-ocr-apple-vision-v1";
 
 interface AppleVisionSuccessPayload {
@@ -53,15 +53,15 @@ type AppleVisionPayload = AppleVisionSuccessPayload | AppleVisionErrorPayload;
 
 export interface AppleVisionOcrOptions {
   /**
-   * Contrôles qualité appliqués aux lignes transcrites. Voir
-   * `locales/` pour les contrôles livrés avec le package.
+   * Quality checks applied to the transcribed lines. See `locales/` for the
+   * checks shipped with the package.
    */
   readonly qualityChecks?: readonly OcrQualityCheck[];
   readonly thresholds?: OcrConfidenceThresholds;
   /**
-   * Emplacement du binaire compilé. Défaut : un chemin temporaire dérivé du nom
-   * du moteur. Le surcharger permet de compiler une fois à l'installation
-   * plutôt qu'au premier appel.
+   * Where the compiled binary lives. Defaults to a temporary path derived from
+   * the engine name. Overriding it allows compiling once at install time,
+   * rather than on the first call.
    */
   readonly binaryPath?: string;
 }
@@ -123,8 +123,8 @@ export function createAppleVisionOcrProvider(
           ]);
         }
       } finally {
-        // Nettoyage best-effort : un temporaire résiduel ne doit pas masquer
-        // le résultat de la transcription.
+        // Best-effort cleanup: a leftover temp file must not mask the
+        // transcription result.
         await Deno.remove(imagePath).catch(() => {});
       }
     },
@@ -132,8 +132,9 @@ export function createAppleVisionOcrProvider(
 }
 
 /**
- * Parse la sortie JSON du helper. Exporté pour être testable sans macOS —
- * c'est le seul morceau de logique de ce module qui ne dépend pas de l'hôte.
+ * Parses the helper's JSON output. Exported so it can be tested without macOS —
+ * it is the only piece of logic in this module that does not depend on the
+ * host.
  */
 export function parseAppleVisionOcrOutput(
   stdout: string,
@@ -182,7 +183,7 @@ export function parseAppleVisionOcrOutput(
   };
 }
 
-/** Chemin du source Objective-C embarqué dans le package. */
+/** Path to the Objective-C source bundled with the package. */
 export function appleVisionHelperSourcePath(): string {
   return fromFileUrl(new URL("./native/apple-vision-ocr.m", import.meta.url));
 }

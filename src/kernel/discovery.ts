@@ -1,13 +1,14 @@
 /**
- * Découverte des produits à scraper pour une source, à un instantané donné.
+ * Discovery of the products to scrape for a source, at a given snapshot.
  *
- * Le kernel ne sait pas **où** vit la liste de candidats : base de données,
- * fichier JSON, appel HTTP, tableau en dur. Il consomme une `CandidateSource`
- * et se charge du seul invariant qui compte — la validation *fail loud*.
+ * The kernel does not know **where** the candidate list lives: a database, a
+ * JSON file, an HTTP call, a hard-coded array. It consumes a `CandidateSource`
+ * and takes care of the one invariant that matters — validation that *fails
+ * loudly*.
  *
- * `fail loud` est le comportement voulu : une liste vide signifie presque
- * toujours une étape de synchronisation oubliée en amont. Scraper zéro URL en
- * silence coûte une exécution complète avant qu'on s'en aperçoive.
+ * Failing loudly is the intended behavior: an empty list almost always means a
+ * synchronization step was skipped upstream. Silently scraping zero URLs costs
+ * a full run before anyone notices.
  *
  * ```ts
  * const source = inMemoryCandidateSource([
@@ -20,24 +21,24 @@
  * ```
  */
 
-/** Produit candidat validé, prêt à être fetché. */
+/** Validated candidate product, ready to be fetched. */
 export interface CandidateProduct {
   url: string;
   productId: string;
 }
 
-/** Coordonnées d'une requête de candidats : quelle source, quel instantané. */
+/** Coordinates of a candidate query: which source, which snapshot. */
 export interface CandidateQuery {
   sourceSlug: string;
   quarter: string;
 }
 
 /**
- * Ligne brute retournée par une `CandidateSource`, avant validation.
+ * Raw row returned by a `CandidateSource`, before validation.
  *
- * `TMeta` porte les métadonnées propres au domaine du consommateur (identifiant
- * de catalogue, nom localisé, catégorie…). Le kernel ne les lit jamais : il les
- * transporte tel quel jusqu'à l'appelant.
+ * `TMeta` carries the metadata specific to the consumer's domain (catalog
+ * identifier, localized name, category…). The kernel never reads it: it
+ * carries it through to the caller untouched.
  */
 export interface CandidateRecord<TMeta = Record<string, unknown>> {
   productUrl: string | null;
@@ -46,18 +47,18 @@ export interface CandidateRecord<TMeta = Record<string, unknown>> {
 }
 
 /**
- * Source de candidats. Une seule méthode, à charge de l'implémentation de
- * retourner les lignes déjà ordonnées par priorité décroissante — le kernel
- * préserve l'ordre reçu et ne réordonne pas.
+ * A source of candidates. One method only, and it is up to the implementation
+ * to return rows already ordered by decreasing priority — the kernel keeps the
+ * order it receives and never reorders.
  */
 export interface CandidateSource<TMeta = Record<string, unknown>> {
   list(query: CandidateQuery): Promise<readonly CandidateRecord<TMeta>[]>;
 }
 
 /**
- * Levée quand une source ne retourne aucun candidat. Typée pour que les
- * appelants qui tolèrent l'absence filtrent par `instanceof` plutôt que par
- * correspondance de chaîne sur le message.
+ * Thrown when a source returns no candidate at all. Typed so that callers who
+ * tolerate the absence can filter on `instanceof` rather than string-matching
+ * the message.
  */
 export class CandidatesNotFoundError extends Error {
   readonly query: CandidateQuery;
@@ -71,7 +72,7 @@ export class CandidatesNotFoundError extends Error {
   }
 }
 
-/** Levée quand une ligne est présente mais inexploitable. */
+/** Thrown when a row is present but unusable. */
 export class InvalidCandidateError extends Error {
   readonly index: number;
   readonly field: "productUrl" | "productId";
@@ -108,7 +109,7 @@ function assertUsable<TMeta>(
   return rows;
 }
 
-/** Charge les candidats validés, sans métadonnées. */
+/** Loads the validated candidates, without metadata. */
 export async function loadCandidateProducts(
   source: CandidateSource,
   query: CandidateQuery,
@@ -121,7 +122,7 @@ export async function loadCandidateProducts(
   }));
 }
 
-/** Charge les candidats validés en conservant les métadonnées du domaine. */
+/** Loads the validated candidates, keeping the domain metadata. */
 export async function loadCandidateProductsWithMeta<TMeta>(
   source: CandidateSource<TMeta>,
   query: CandidateQuery,
@@ -136,8 +137,8 @@ export async function loadCandidateProductsWithMeta<TMeta>(
 }
 
 /**
- * Source en mémoire, pour les tests et le démarrage. Ignore `query` : elle
- * retourne toujours les lignes fournies à la construction.
+ * In-memory source, for tests and for getting started. Ignores `query`: it
+ * always returns the rows supplied at construction time.
  */
 export function inMemoryCandidateSource<TMeta = Record<string, unknown>>(
   rows: readonly CandidateRecord<TMeta>[],

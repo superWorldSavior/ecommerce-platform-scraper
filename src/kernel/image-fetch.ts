@@ -1,10 +1,9 @@
 /**
- * Téléchargement d'images vers du base64, pour l'OCR et les modèles vision.
+ * Downloads images into base64, for OCR and vision models.
  *
- * Les deux consommateurs attendent du base64 sans préfixe `data:`, et ont besoin
- * du type MIME réel : un fichier `.jpg` servi en `image/webp` fait échouer un
- * décodeur strict. Le type est donc dérivé du header de la réponse, pas de
- * l'extension de l'URL.
+ * Both consumers expect base64 with no `data:` prefix, and need the real MIME
+ * type: a `.jpg` file served as `image/webp` breaks a strict decoder. The type
+ * is therefore derived from the response header, not from the URL extension.
  */
 
 import { encodeBase64 } from "@std/encoding/base64";
@@ -17,13 +16,13 @@ export interface FetchedImageBase64 {
 }
 
 /**
- * Échec discriminable de `fetchImageAsBase64`.
+ * Discriminable failure of `fetchImageAsBase64`.
  *
- *  - `HTTP_NOT_OK` — réponse non-2xx. `status` est renseigné.
- *  - `FETCH_FAILED` — erreur réseau ou dépassement du délai.
+ *  - `HTTP_NOT_OK` — non-2xx response. `status` is set.
+ *  - `FETCH_FAILED` — network error or timeout.
  *
- * La distinction compte : un 404 est définitif et l'appelant doit passer à la
- * suite, une erreur réseau mérite un nouvel essai.
+ * The distinction matters: a 404 is final and the caller should move on, while
+ * a network error deserves another attempt.
  */
 export class ImageFetchError extends Error {
   override readonly name = "ImageFetchError";
@@ -38,19 +37,19 @@ export class ImageFetchError extends Error {
 }
 
 export interface FetchImageOptions {
-  /** Délai maximal en millisecondes. Défaut 30 000. */
+  /** Maximum delay in milliseconds. Defaults to 30,000. */
   timeoutMs?: number;
   /**
-   * Implémentation de `fetch` à utiliser. Réservé aux tests.
+   * The `fetch` implementation to use. Reserved for tests.
    *
-   * Typé `unknown` pour contourner le conflit entre `globalThis.fetch` et les
-   * types `node-fetch` importés transitivement par certaines dépendances. En
-   * exécution, toute implémentation conforme fonctionne.
+   * Typed `unknown` to work around the clash between `globalThis.fetch` and the
+   * `node-fetch` types some dependencies pull in transitively. At runtime, any
+   * conforming implementation works.
    */
   _fetch?: unknown;
 }
 
-/** `image/jpeg` par défaut : le format le plus courant sur les CDN produit. */
+/** `image/jpeg` by default: the most common format on product CDNs. */
 function classifyMimeType(contentType: string | null): ImageMimeType {
   if (!contentType) return "image/jpeg";
   const lower = contentType.toLowerCase();

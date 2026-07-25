@@ -1,16 +1,16 @@
 /**
- * Sélection du contexte envoyé à un modèle, à partir d'artefacts scrapés
- * classés par rôle.
+ * Selects the context sent to a model out of scraped artifacts, grouped by
+ * role.
  *
- * Un **artefact** est un fragment capturé d'une page : le HTML lui-même, une
- * image passée à l'OCR, un bloc de description. Un **rôle** dit à quoi sert ce
- * fragment. Une **projection** est ce qu'on cherche à extraire.
+ * An **artifact** is a captured fragment of a page: the HTML itself, an image
+ * fed to OCR, a description block. A **role** says what that fragment is for.
+ * A **projection** is what we are trying to extract.
  *
- * Le vocabulaire de rôles appartient au **domaine**, pas au kernel : scraper des
- * compléments alimentaires demande un rôle « étiquette nutritionnelle », scraper
- * des composants électroniques demande « fiche technique ». Le kernel fournit
- * donc la *mécanique* (classification, sélection, repli, comptage) et reçoit le
- * *vocabulaire* via `RoleVocabulary`.
+ * The role vocabulary belongs to the **domain**, not to the kernel: scraping
+ * dietary supplements needs a "nutrition label" role, scraping electronic
+ * components needs "datasheet". So the kernel supplies the *mechanics*
+ * (classification, selection, fallback, counting) and receives the *vocabulary*
+ * through `RoleVocabulary`.
  *
  * ```ts
  * const vocabulary = defineRoleVocabulary({
@@ -28,16 +28,16 @@
  */
 
 /**
- * Rôles valables pour n'importe quel storefront e-commerce. Un domaine étend
- * cette base avec ses propres rôles plutôt que de la remplacer.
+ * Roles that hold for any e-commerce storefront. A domain extends this base
+ * with roles of its own rather than replacing it.
  *
- *  - `html` — la page elle-même : rôle **structurel**, toujours sélectionnable.
- *  - `product-description` — bloc rédactionnel décrivant le produit.
- *  - `certificate` — attestation, label, résultat de test.
- *  - `related-product` — cross-sell, « vous aimerez aussi ».
- *  - `promo` — bandeau marketing, code de réduction.
- *  - `ui` — chrome du gabarit : logo, favicon, icônes.
- *  - `unknown` — non classé.
+ *  - `html` — the page itself: a **structural** role, always selectable.
+ *  - `product-description` — editorial block describing the product.
+ *  - `certificate` — attestation, label, test result.
+ *  - `related-product` — cross-sell, "you may also like".
+ *  - `promo` — marketing banner, discount code.
+ *  - `ui` — template chrome: logo, favicon, icons.
+ *  - `unknown` — unclassified.
  */
 export const BASE_ARTIFACT_ROLES = [
   "html",
@@ -51,7 +51,7 @@ export const BASE_ARTIFACT_ROLES = [
 
 export type BaseArtifactRole = typeof BASE_ARTIFACT_ROLES[number];
 
-/** Rôles de la base qui n'apportent jamais de contenu produit exploitable. */
+/** Base roles that never carry usable product content. */
 export const BASE_NOISE_ROLES = [
   "ui",
   "promo",
@@ -59,21 +59,21 @@ export const BASE_NOISE_ROLES = [
 ] as const satisfies readonly BaseArtifactRole[];
 
 /**
- * Vocabulaire de rôles d'un domaine.
+ * A domain's role vocabulary.
  *
- * `structural` et `unknownRole` doivent appartenir à `roles` — c'est vérifié à
- * la construction par `defineRoleVocabulary`.
+ * `structural` and `unknownRole` must belong to `roles` — checked at
+ * construction time by `defineRoleVocabulary`.
  */
 export interface RoleVocabulary<TRole extends string> {
-  /** Tous les rôles du domaine. Sert à construire les compteurs. */
+  /** Every role in the domain. Used to build the counters. */
   readonly roles: readonly TRole[];
-  /** Rôle de la page entière : échappe au filtre de bruit. */
+  /** Role of the page as a whole: exempt from the noise filter. */
   readonly structural: TRole;
-  /** Rôle des artefacts non classés. */
+  /** Role given to unclassified artifacts. */
   readonly unknownRole: TRole;
-  /** Rôles qui disqualifient un artefact, sauf s'il est aussi `structural`. */
+  /** Roles that disqualify an artifact, unless it is also `structural`. */
   readonly noise: readonly TRole[];
-  /** Rôles préférés par projection. Une projection absente ⇒ contexte complet. */
+  /** Preferred roles per projection. A missing projection ⇒ full context. */
   readonly preferences: Readonly<Record<string, readonly TRole[]>>;
 }
 
@@ -85,9 +85,9 @@ export class RoleVocabularyError extends Error {
 }
 
 /**
- * Construit un vocabulaire en validant sa cohérence interne. `structural`,
- * `unknownRole`, `noise` et les rôles cités dans `preferences` doivent tous
- * figurer dans `roles` — sinon les compteurs auraient des trous silencieux.
+ * Builds a vocabulary, checking its internal consistency. `structural`,
+ * `unknownRole`, `noise` and every role named in `preferences` must appear in
+ * `roles` — otherwise the counters would silently have holes.
  */
 export function defineRoleVocabulary<TRole extends string>(
   spec: {
@@ -207,7 +207,7 @@ export interface ProjectionContext<
   providerFallbackReason: string | null;
 }
 
-/** Compteurs à zéro pour tous les rôles du vocabulaire. */
+/** Zeroed counters for every role in the vocabulary. */
 export function createEmptyRoleCounts<TRole extends string>(
   vocabulary: RoleVocabulary<TRole>,
 ): Record<TRole, number> {
@@ -217,9 +217,9 @@ export function createEmptyRoleCounts<TRole extends string>(
 }
 
 /**
- * Provider de repli : classe la page en `structural`, tout le reste en
- * `unknownRole`, et ne filtre rien. C'est le comportement quand aucun provider
- * spécifique n'est déclaré pour une source.
+ * Fallback provider: labels the page `structural`, everything else
+ * `unknownRole`, and filters nothing. This is the behavior when no specific
+ * provider is declared for a source.
  */
 export function createDefaultArtifactContextProvider<TRole extends string>(
   vocabulary: RoleVocabulary<TRole>,
@@ -249,12 +249,12 @@ export function preferredRolesForProjection<TRole extends string>(
 }
 
 /**
- * Réduit les artefacts d'une page au sous-ensemble utile à une projection.
+ * Narrows a page's artifacts down to the subset useful to one projection.
  *
- * Retombe sur le contexte complet — en renseignant `fallbackReason` — dans
- * quatre cas : aucun provider, classification vide de signal, projection sans
- * préférence déclarée, ou filtre ne laissant rien. Un contexte complet reste
- * exploitable ; un contexte vide ne l'est pas.
+ * Falls back to the full context — recording `fallbackReason` — in four cases:
+ * no provider, a classification carrying no signal, a projection with no
+ * declared preference, or a filter that leaves nothing behind. A full context
+ * is still usable; an empty one is not.
  */
 export function selectProjectionContext<
   TRole extends string,
@@ -358,9 +358,9 @@ export function selectProjectionContext<
 }
 
 /**
- * Artefacts du contexte portant l'un des rôles demandés. Si aucun ne
- * correspond mais que le contexte est déjà un repli, retourne tout — sinon
- * l'appelant perdrait le peu d'information disponible.
+ * Artifacts of the context that carry one of the requested roles. If none
+ * match but the context is already a fallback, returns everything — otherwise
+ * the caller would lose the little information there is.
  */
 export function projectionContextArtifactsWithRoles<
   TRole extends string,
@@ -389,7 +389,7 @@ export function sumArtifactChars(
   );
 }
 
-/** Normalise une URL extraite d'un HTML brut. `null` si non http(s). */
+/** Normalizes a URL extracted from raw HTML. `null` if not http(s). */
 export function normalizeArtifactUrl(raw: string): string | null {
   const url = raw
     .replaceAll("&amp;", "&")

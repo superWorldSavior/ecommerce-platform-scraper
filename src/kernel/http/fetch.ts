@@ -1,15 +1,15 @@
 /**
- * Client HTTP à débit borné, pour parcourir sitemaps et pages produit.
+ * Rate-limited HTTP client, for walking sitemaps and product pages.
  *
- * Garantit un intervalle minimal entre deux appels au **même hôte** — la limite
- * qui compte, puisque c'est le serveur d'en face qu'on ménage. Les échecs
- * portent un code discriminable (`HTTP_STATUS`, `FETCH_ABORTED`,
- * `FETCH_FAILED`) pour que l'appelant choisisse entre réessai et abandon sans
- * analyser un message.
+ * Guarantees a minimum interval between two calls to the **same host** — the
+ * limit that matters, since the server on the other end is what we are being
+ * gentle with. Failures carry a discriminable code (`HTTP_STATUS`,
+ * `FETCH_ABORTED`, `FETCH_FAILED`) so the caller can choose between retrying
+ * and giving up without picking a message apart.
  *
- * **Limites assumées** : cadencement fixe, sans gigue ni repli exponentiel, et
- * l'en-tête `Retry-After` n'est pas honoré. Suffisant pour des sites qui ne
- * limitent pas le débit ; à durcir avant de viser un site qui répond 429.
+ * **Accepted limits**: fixed pacing, with neither jitter nor exponential
+ * backoff, and the `Retry-After` header is not honored. Good enough for sites
+ * that do not throttle; harden it before aiming at a site that answers 429.
  */
 
 export interface PoliteFetcherOptions {
@@ -50,12 +50,12 @@ export class HttpFetchError extends Error {
 }
 
 /**
- * User-Agent par défaut : identifie la bibliothèque sans se faire passer pour
- * un navigateur.
+ * Default User-Agent: identifies the library without pretending to be a
+ * browser.
  *
- * **À surcharger.** Un crawler correct s'identifie et laisse un moyen de le
- * joindre — `userAgent: "acme-bot/1.0 (+https://acme.example/bot)"`. Un
- * opérateur joignable se fait bloquer bien moins souvent qu'un anonyme.
+ * **Override it.** A well-behaved crawler identifies itself and leaves a way to
+ * get in touch — `userAgent: "acme-bot/1.0 (+https://acme.example/bot)"`. A
+ * reachable operator gets blocked far less often than an anonymous one.
  */
 const DEFAULT_UA = "ecommerce-platform-scraper/0.1";
 
@@ -167,11 +167,10 @@ function sleep(ms: number): Promise<void> {
 /**
  * Parse `robots.txt` and return disallow rules applicable to `User-agent: *`.
  *
- * Ne prétend pas être un parser robots complet : ignore les wildcards
- * inline autres que `*` en fin de pattern, les directives `Crawl-delay`,
- * les sections User-agent spécifiques. Suffisant pour garder en tête les
- * paths à NE PAS crawler et échouer fast-fail si un sitemap nous propose
- * un URL disallow.
+ * Makes no claim to be a complete robots parser: it ignores inline wildcards
+ * other than a trailing `*`, `Crawl-delay` directives, and agent-specific
+ * User-agent sections. Enough to keep track of the paths we must NOT crawl,
+ * and to fail fast when a sitemap hands us a disallowed URL.
  */
 export interface RobotsRules {
   disallow: string[];

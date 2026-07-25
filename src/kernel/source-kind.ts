@@ -1,34 +1,34 @@
 /**
- * Identité et méthode d'extraction d'une source scrapée.
+ * Identity and extraction method of a scraped source.
  *
- * `SourceKind` est **ouvert** : c'est un alias de `string`, pas une union
- * fermée. Chaque consommateur décide de son propre vocabulaire de sources et
- * peut le refermer chez lui s'il veut l'exhaustivité au compile-time :
+ * `SourceKind` is **open**: it is an alias for `string`, not a closed union.
+ * Every consumer decides on its own source vocabulary and can close it locally
+ * if it wants compile-time exhaustiveness:
  *
  * ```ts
  * const MY_SOURCES = ["acme-store", "globex-store"] as const;
- * type MySource = typeof MY_SOURCES[number];   // union fermée, côté appelant
+ * type MySource = typeof MY_SOURCES[number];   // closed union, caller-side
  * type MyStageSource = StageSource<MySource>;
  * ```
  *
- * Ce choix est volontaire. Une union fermée dans le package obligerait à
- * publier la liste des sites scrapés — information privée du consommateur — et
- * imposerait une release à chaque ajout de source.
+ * That choice is deliberate. A closed union inside the package would force
+ * publishing the list of scraped sites — information private to the consumer —
+ * and would require a release for every source added.
  */
 export type SourceKind = string;
 
 /**
- * Stratégie d'extraction d'une source, indépendante du site.
+ * A source's extraction strategy, independent of the site.
  *
- * Les valeurs préfixées par un moteur (`shopline-*`, `cyberbiz-*`) supposent les
- * conventions de ce moteur, décrites dans `platforms/`. Les autres décrivent la
- * forme du storefront sans hypothèse de plateforme :
+ * Values prefixed with an engine name (`shopline-*`, `cyberbiz-*`) assume that
+ * engine's conventions, described under `platforms/`. The others describe the
+ * shape of the storefront without assuming a platform:
  *
- *  - `sitemap-jsonld` — sitemap.xml + bloc JSON-LD `Product` par page.
- *  - `sitemap-jsonld-llm` — idem, complété par une passe LLM quand le JSON-LD
- *    est incomplet.
- *  - `jsonld-product-php` — JSON-LD présent, URLs produit en querystring.
- *  - `html-direct` — aucun JSON-LD exploitable, parsing HTML direct.
+ *  - `sitemap-jsonld` — sitemap.xml and one `Product` JSON-LD block per page.
+ *  - `sitemap-jsonld-llm` — the same, topped up by an LLM pass when the JSON-LD
+ *    is incomplete.
+ *  - `jsonld-product-php` — JSON-LD present, product URLs in the querystring.
+ *  - `html-direct` — no usable JSON-LD, direct HTML parsing.
  */
 export type SourceMethod =
   | "jsonld-product-php"
@@ -38,7 +38,7 @@ export type SourceMethod =
   | "sitemap-jsonld-llm"
   | "sitemap-jsonld";
 
-/** Provenance d'un snapshot scrapé, consommée par les étapes de staging. */
+/** Provenance of a scraped snapshot, consumed by the staging steps. */
 export interface StageSource<TKind extends SourceKind = SourceKind> {
   kind: TKind;
   method?: SourceMethod;

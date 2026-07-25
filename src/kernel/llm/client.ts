@@ -1,24 +1,25 @@
 /**
- * Client LLM provider-agnostic : extraction structurée et complétion texte,
- * avec routage automatique vers un modèle vision quand une image est fournie.
+ * Provider-agnostic LLM client: structured extraction and text completion,
+ * with automatic routing to a vision model when an image is supplied.
  *
- * Parle à **toute API compatible OpenAI** — runtime local, passerelle
- * auto-hébergée, service hébergé. Changer de fournisseur ou de modèle se fait
- * par variables d'environnement, sans modification de code.
+ * Talks to **any OpenAI-compatible API** — a local runtime, a self-hosted
+ * gateway, a hosted service. Switching provider or model is done through
+ * environment variables, with no code change.
  *
- * Contrat :
- *   - Pas de JSON Schema strict : tous les endpoints ne l'implémentent pas.
- *     À la place, schéma décrit dans le prompt + mode `json_object` +
- *     validation Zod + retry borné. Échec explicite si toujours invalide.
- *   - Pas de side-effect : fonction pure qui renvoie `{ data, usage }`. Le
- *     caller décide quoi faire du coût/tokens (log, métrique, cache).
- *   - Pas de cache interne : le cache (si nécessaire) vit au niveau caller
- *     (hash du payload input → résultat), jamais dans ce module.
- *   - **Erreurs discriminables** : chaque échec porte un `code` + un message
- *     explicite. Le batch peut router selon le code (re-essayer plus tard sur
- *     `RATE_LIMITED`, abort sur `AUTH`, escalader sur `MODEL_NOT_FOUND`).
- *     Pas de retry interne sur les codes déterministes (AUTH, MODEL_NOT_FOUND,
- *     INVALID_OUTPUT) — re-essayer ne les répare pas.
+ * The contract:
+ *   - No strict JSON Schema: not every endpoint implements it. Instead, the
+ *     schema is described in the prompt, `json_object` mode is requested, the
+ *     result is validated with Zod, and retries are bounded. Explicit failure
+ *     if it is still invalid.
+ *   - No side effects: a pure function returning `{ data, usage }`. The caller
+ *     decides what to do with the cost and token counts (log, metric, cache).
+ *   - No internal cache: the cache, where one is needed, lives at the caller
+ *     level (hash of the input payload → result), never in this module.
+ *   - **Discriminable errors**: every failure carries a `code` and an explicit
+ *     message. A batch can route on the code (retry later on `RATE_LIMITED`,
+ *     abort on `AUTH`, escalate on `MODEL_NOT_FOUND`). No internal retry on the
+ *     deterministic codes (AUTH, MODEL_NOT_FOUND, INVALID_OUTPUT) — retrying
+ *     does not fix them.
  */
 
 import OpenAI, { type ClientOptions } from "openai";
@@ -42,16 +43,16 @@ export interface LlmExtractInput<T> {
   schema: z.ZodType<T, z.ZodTypeDef, unknown>;
   maxRetries?: number;
   /**
-   * Optionnel : image base64 (sans préfixe `data:`) à fournir au modèle vision.
-   * Le content du message user devient un array
+   * Optional: base64 image (no `data:` prefix) to hand to the vision model.
+   * The user message content then becomes an array
    * `[{type:"text",...}, {type:"image_url",...}]`.
-   * Quand présent, route vers `LLM_VISION_MODEL` (obligatoire dans ce cas).
-   * Sinon route vers `LLM_MODEL`.
+   * When present, routes to `LLM_VISION_MODEL` (mandatory in that case).
+   * Otherwise routes to `LLM_MODEL`.
    */
   imageBase64?: string;
-  /** MIME type de l'image. Défaut "image/jpeg". */
+  /** MIME type of the image. Defaults to "image/jpeg". */
   imageMimeType?: "image/jpeg" | "image/png" | "image/webp";
-  /** Taille de la fenêtre de contexte, si l'endpoint expose `options.num_ctx`. */
+  /** Context window size, if the endpoint exposes `options.num_ctx`. */
   numCtx?: number;
 }
 
@@ -60,15 +61,15 @@ export interface LlmCompleteInput {
   userPrompt: string;
   maxRetries?: number;
   /**
-   * Optionnel : image base64 (sans préfixe `data:`) à fournir au modèle vision.
-   * Quand présent, route vers `LLM_VISION_MODEL` (comme `extract()`).
-   * Le content du message user devient un array
+   * Optional: base64 image (no `data:` prefix) to hand to the vision model.
+   * When present, routes to `LLM_VISION_MODEL` (same as `extract()`).
+   * The user message content then becomes an array
    * `[{type:"text",...}, {type:"image_url",...}]`.
    */
   imageBase64?: string;
-  /** MIME type de l'image. Défaut "image/jpeg". */
+  /** MIME type of the image. Defaults to "image/jpeg". */
   imageMimeType?: "image/jpeg" | "image/png" | "image/webp";
-  /** Taille de la fenêtre de contexte, si l'endpoint expose `options.num_ctx`. */
+  /** Context window size, if the endpoint exposes `options.num_ctx`. */
   numCtx?: number;
 }
 
@@ -81,26 +82,28 @@ export interface LlmCompleteResult {
 export interface LlmClient {
   extract<T>(input: LlmExtractInput<T>): Promise<LlmExtractResult<T>>;
   /**
-   * Complétion plain text — pas de mode `response_format: json_object`. Utile
-   * pour les sorties longues où le JSON strict fait timeout côté provider
-   * (transcription markdown ~10-20 KB en zh-TW). Le caller est responsable
-   * de parser/valider le texte selon son contrat. Aucun retry sur output
-   * vide — c'est au caller de décider si une réponse vide est acceptable.
+   * Plain-text completion — no `response_format: json_object` mode. Useful for
+   * long outputs where strict JSON times out on the provider side (markdown
+   * transcription of ~10-20 KB in zh-TW). The caller is responsible for
+   * parsing and validating the text against its own contract. No retry on
+   * empty output — it is up to the caller to decide whether an empty response
+   * is acceptable.
    */
   complete(input: LlmCompleteInput): Promise<LlmCompleteResult>;
 }
 
 /**
- * Codes d'erreur discriminables. Le batch caller route selon :
- *  - `AUTH` / `MODEL_NOT_FOUND` : abort, problème de configuration.
- *  - `RATE_LIMITED` : attendre `retryAfterSeconds`, puis re-soumettre. Quota
- *    endpoint par fenêtre — le caller doit gérer la pause.
- *  - `NETWORK` / `PROVIDER_ERROR` : transient, peut être ré-essayé après
- *    backoff. Le client retry déjà en interne avec backoff exponentiel.
- *  - `INVALID_OUTPUT` : le LLM a produit du JSON/Zod invalide après tous les
- *    retries. Pas un bug réseau — soit le prompt est mauvais, soit le modèle.
- *  - `EMPTY_RESPONSE` : choix.length 0 ou content vide — anomalie provider.
- *  - `UNKNOWN` : tout le reste, log + escalade.
+ * Discriminable error codes. The batch caller routes on them:
+ *  - `AUTH` / `MODEL_NOT_FOUND`: abort, this is a configuration problem.
+ *  - `RATE_LIMITED`: wait `retryAfterSeconds`, then resubmit. Per-window
+ *    endpoint quota — pausing is the caller's job.
+ *  - `NETWORK` / `PROVIDER_ERROR`: transient, can be retried after a backoff.
+ *    The client already retries internally with exponential backoff.
+ *  - `INVALID_OUTPUT`: the model produced JSON that failed to parse or to
+ *    validate, after every retry. Not a network bug — either the prompt is
+ *    wrong or the model is.
+ *  - `EMPTY_RESPONSE`: zero choices, or empty content — a provider anomaly.
+ *  - `UNKNOWN`: everything else; log and escalate.
  */
 export type LlmErrorCode =
   | "AUTH"
@@ -164,24 +167,25 @@ function createTimeoutFetch(timeoutMs: number): typeof fetch {
 }
 
 /**
- * Classifie une erreur OpenAI SDK ou native vers un `LlmErrorCode`.
+ * Classifies an OpenAI SDK error, or a native one, into an `LlmErrorCode`.
  *
- * Le SDK `openai` (v4) lève `OpenAI.APIError` avec un champ `status` HTTP. On
- * mappe explicitement les codes attendus de l'endpoint compatible OpenAI :
- *  - 401 / 403 → AUTH (clé invalide ou révoquée)
- *  - 404 → MODEL_NOT_FOUND (modèle pas dispo sur le compte)
- *  - 429 → RATE_LIMITED (quota fenêtre épuisé, lire `retry-after` header)
- *  - 5xx → PROVIDER_ERROR (transient, retry OK)
- *  - autre → UNKNOWN
+ * The `openai` SDK (v4) throws `OpenAI.APIError` with an HTTP `status` field.
+ * We map the codes an OpenAI-compatible endpoint is expected to return:
+ *  - 401 / 403 → AUTH (invalid or revoked key)
+ *  - 404 → MODEL_NOT_FOUND (model not available on the account)
+ *  - 429 → RATE_LIMITED (window quota exhausted, read the `retry-after` header)
+ *  - 5xx → PROVIDER_ERROR (transient, safe to retry)
+ *  - anything else → UNKNOWN
  *
- * Les `TypeError` / `AbortError` côté fetch sont classés NETWORK.
+ * The `TypeError` / `AbortError` raised by fetch are classified as NETWORK.
  */
 function classifyError(
   error: unknown,
 ): { code: LlmErrorCode; retryAfterSeconds?: number; message: string } {
-  // APIConnectionError extends APIError mais n'a pas de status HTTP — il représente
-  // un échec réseau (fetch throw, timeout) que le SDK a enveloppé. À traiter avant
-  // le check générique APIError pour éviter de tomber dans la branche status=undefined.
+  // APIConnectionError extends APIError but carries no HTTP status — it stands
+  // for a network failure (fetch throw, timeout) that the SDK wrapped. Handle
+  // it before the generic APIError check, to avoid landing in the
+  // status=undefined branch.
   if (error instanceof OpenAI.APIConnectionError) {
     return {
       code: "NETWORK",
@@ -260,31 +264,32 @@ function classifyError(
 }
 
 /**
- * `true` si le code mérite un nouveau retry (transient). `false` pour les
- * erreurs déterministes (AUTH, MODEL_NOT_FOUND, RATE_LIMITED) — re-essayer
- * sur la même fenêtre ne les répare pas, c'est au caller batch de décider
- * (waiter, abort, escalader).
+ * `true` when the code deserves another retry (transient). `false` for the
+ * deterministic errors (AUTH, MODEL_NOT_FOUND, RATE_LIMITED) — retrying within
+ * the same window does not fix them; it is up to the batch caller to decide
+ * (wait, abort, escalate).
  */
 function isRetriableCode(code: LlmErrorCode): boolean {
   return code === "NETWORK" || code === "PROVIDER_ERROR";
 }
 
 /**
- * Walk la chaîne `error.cause` pour récupérer le `LlmErrorCode` typé d'une
- * erreur — quel que soit le nombre de wrappers (`TranscriptionError`,
- * `ImageTranscriptionError`, etc.) entre le call site et la racine.
+ * Walks the `error.cause` chain to recover an error's typed `LlmErrorCode`,
+ * however many wrappers (`TranscriptionError`, `ImageTranscriptionError`, etc.)
+ * sit between the call site and the root.
  *
- * Renvoie `null` si la chaîne ne contient aucun `LlmClientError`. Plus
- * robuste qu'un regex sur `error.message` qui rompt si un wrapper change
- * son format de message.
+ * Returns `null` when the chain holds no `LlmClientError`. More robust than a
+ * regex over `error.message`, which breaks as soon as a wrapper changes its
+ * message format.
  *
- * Exemple consommateur : negative cache de transcribe-images qui veut
- * skipper les SKUs siblings d'un contenu qui a déclenché un
- * `code === "PROVIDER_ERROR"` (qwen3-vl OOM sur banner Shopline).
+ * Example consumer: the negative cache in transcribe-images, which wants to
+ * skip the sibling SKUs of a piece of content that triggered a
+ * `code === "PROVIDER_ERROR"` (vision model out of memory on a Shopline
+ * banner).
  */
 export function extractLlmErrorCode(err: unknown): LlmErrorCode | null {
   let cursor: unknown = err;
-  // Garde-fou anti-cycle (cause peut pointer en boucle théoriquement).
+  // Cycle guard (in theory, `cause` can loop back on itself).
   for (
     let depth = 0;
     depth < 8 && cursor !== null && cursor !== undefined;
@@ -298,10 +303,10 @@ export function extractLlmErrorCode(err: unknown): LlmErrorCode | null {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers privés
+// Private helpers
 // ---------------------------------------------------------------------------
 
-/** Construit le content du message user. Pure, sans side-effect. */
+/** Builds the user message content. Pure, no side effects. */
 function buildUserContent(
   userPrompt: string,
   imageBase64?: string,
@@ -319,7 +324,7 @@ function buildUserContent(
   ];
 }
 
-/** Sélectionne le modèle texte ou vision selon la présence d'une image. Pure. */
+/** Picks the text or vision model based on whether an image is present. */
 function selectModel(
   textModel: string,
   visionModel: string,
@@ -329,9 +334,9 @@ function selectModel(
 }
 
 /**
- * Certains modèles cloud (gemma) entourent le JSON de fences markdown malgré
- * `json_object` mode. Retire une paire de fences englobante ; laisse tout
- * autre contenu intact (le JSON.parse tranchera).
+ * Some hosted models wrap the JSON in markdown fences despite `json_object`
+ * mode. Strips one enclosing pair of fences; leaves any other content
+ * untouched (`JSON.parse` will be the judge).
  */
 function stripMarkdownFences(raw: string): string {
   const match = raw.trim().match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);
@@ -339,25 +344,25 @@ function stripMarkdownFences(raw: string): string {
 }
 
 /**
- * Résultat interne de validation du contenu brut d'une réponse LLM.
- * - `ok: true`  → `data` est la valeur typée finale.
- * - `ok: false` → erreur récupérable (retry) ou fatale selon `errorCode`.
+ * Internal result of validating the raw content of an LLM response.
+ * - `ok: true`  → `data` is the final typed value.
+ * - `ok: false` → recoverable (retry) or fatal, depending on `errorCode`.
  */
 type ValidateResult<T> =
   | { ok: true; data: T }
   | { ok: false; errorCode: LlmErrorCode; message: string; cause?: unknown };
 
 /**
- * Cœur partagé de la boucle retry pour `extract` et `complete`.
+ * Shared core of the retry loop for `extract` and `complete`.
  *
- * `validateContent` encapsule la seule logique divergente entre les deux
- * callers :
- *  - `extract` : parse JSON → valide Zod → INVALID_OUTPUT si échec (retry).
- *  - `complete` : passe-through, toujours `ok: true`.
+ * `validateContent` holds the only logic that differs between the two callers:
+ *  - `extract`: parse JSON → validate with Zod → INVALID_OUTPUT on failure
+ *    (retry).
+ *  - `complete`: pass-through, always `ok: true`.
  *
- * `aggregateUsage` gère la politique d'accumulation des tokens :
- *  - `extract` : somme cross-retries (chaque appel coûte des tokens).
- *  - `complete` : non fourni → la fonction renvoie l'usage du dernier appel.
+ * `aggregateUsage` holds the token accounting policy:
+ *  - `extract`: summed across retries (every call costs tokens).
+ *  - `complete`: not supplied → the function returns the last call's usage.
  */
 async function runChatCompletionWithRetry<T>(opts: {
   client: OpenAI;
@@ -479,44 +484,45 @@ async function runChatCompletionWithRetry<T>(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// Options et factory publique
+// Options and public factory
 // ---------------------------------------------------------------------------
 
 /**
- * Options internes de `createLlmClient`. L'underscore préfixe indique que
- * `_fetch` est réservé aux tests (injection d'un stub fetch). L'API publique
- * est backward-compatible : appeler `createLlmClient()` sans argument reste
- * valide.
+ * Internal options for `createLlmClient`. The leading underscore marks `_fetch`
+ * as reserved for tests (injecting a fetch stub). The public API stays
+ * backward-compatible: calling `createLlmClient()` with no argument is still
+ * valid.
  */
 export interface LlmClientOptions {
   /**
-   * Injecter un fetch stub — usage test uniquement.
-   * Typé `unknown` pour éviter le conflit entre globalThis.Response (Deno) et
-   * node-fetch.Response (capturé par @types/node-fetch via le SDK OpenAI). Le
-   * cast vers ClientOptions["fetch"] est fait en interne lors de la construction.
+   * Inject a fetch stub — test use only.
+   * Typed `unknown` to avoid the clash between globalThis.Response (Deno) and
+   * node-fetch.Response (picked up by @types/node-fetch through the OpenAI
+   * SDK). The cast to ClientOptions["fetch"] happens internally, at
+   * construction time.
    */
   _fetch?: unknown;
 }
 
 /**
- * Crée un client LLM lié à la configuration env. Réutilise la même instance
- * `OpenAI` (réuse connexion keep-alive).
+ * Creates an LLM client bound to the environment configuration. Reuses one
+ * `OpenAI` instance (keep-alive connection reuse).
  *
- * Variables d'environnement, toutes obligatoires :
- *  - `LLM_API_KEY` — clé du fournisseur. Une valeur factice convient pour les
- *    serveurs locaux qui n'authentifient pas.
- *  - `LLM_BASE_URL` — racine d'une API compatible OpenAI. Fonctionne avec tout
- *    serveur respectant ce contrat : runtime local, passerelle auto-hébergée,
- *    ou API hébergée.
- *  - `LLM_MODEL` — modèle texte.
- *  - `LLM_VISION_MODEL` — utilisé uniquement quand `imageBase64` est présent
- *    dans l'input. Séparation explicite pour éviter qu'un changement de modèle
- *    vision n'affecte l'extraction texte, et inversement.
+ * Environment variables, all mandatory:
+ *  - `LLM_API_KEY` — the provider's key. A dummy value is fine for local
+ *    servers that do not authenticate.
+ *  - `LLM_BASE_URL` — root of an OpenAI-compatible API. Works with any server
+ *    honoring that contract: a local runtime, a self-hosted gateway, or a
+ *    hosted API.
+ *  - `LLM_MODEL` — the text model.
+ *  - `LLM_VISION_MODEL` — used only when `imageBase64` is present in the input.
+ *    Kept separate so that changing the vision model cannot affect text
+ *    extraction, or the other way round.
  *
- * **Aucun défaut, y compris pour `LLM_BASE_URL`** : un repli silencieux masque
- * les erreurs de configuration et peut router vers un modèle inexistant, ou
- * vers le service d'un fournisseur que l'appelant n'avait pas choisi. On préfère
- * un `MISSING_ENV` explicite au démarrage.
+ * **No defaults, `LLM_BASE_URL` included**: a silent fallback hides
+ * configuration mistakes and can route to a model that does not exist, or to
+ * the service of a provider the caller never chose. An explicit `MISSING_ENV`
+ * at startup is preferable.
  */
 export function createLlmClient(opts?: LlmClientOptions): LlmClient {
   const apiKey = requireEnv("LLM_API_KEY");
@@ -529,16 +535,18 @@ export function createLlmClient(opts?: LlmClientOptions): LlmClient {
     apiKey,
     baseURL,
     timeout,
-    // Les retries SDK sont désactivés (maxRetries: 0) pour que extract() soit
-    // le seul gestionnaire de retry. Cela permet un contrôle fin par code d'erreur
-    // (RATE_LIMITED non-retry, PROVIDER_ERROR retry avec backoff exponentiel).
-    // Sans ce 0, le SDK ferait ses propres retries sur 429/5xx avant de throw,
-    // empêchant notre classification de voir les réponses intermédiaires.
+    // SDK retries are disabled (maxRetries: 0) so that extract() is the only
+    // retry handler. That allows fine-grained control per error code
+    // (RATE_LIMITED not retried, PROVIDER_ERROR retried with exponential
+    // backoff). Without the 0, the SDK would run its own retries on 429/5xx
+    // before throwing, hiding the intermediate responses from our
+    // classification.
     maxRetries: 0,
-    // Cast justifié : _fetch est unknown pour contourner le conflit de types
-    // entre globalThis.Response (Deno) et node-fetch.Response (@types/node-fetch
-    // transitivement importé par le SDK OpenAI). En runtime, tout fetch valide
-    // fonctionne — le conflit est purement au niveau des déclarations de types.
+    // The cast is justified: _fetch is unknown to work around the type clash
+    // between globalThis.Response (Deno) and node-fetch.Response
+    // (@types/node-fetch, imported transitively by the OpenAI SDK). At runtime
+    // any valid fetch works — the clash is purely at the type-declaration
+    // level.
     fetch: (opts?._fetch as ClientOptions["fetch"] | undefined) ??
       (createTimeoutFetch(timeout) as unknown as ClientOptions["fetch"]),
   });
@@ -602,17 +610,16 @@ export function createLlmClient(opts?: LlmClientOptions): LlmClient {
           input.imageBase64,
           input.imageMimeType,
         ),
-        // PAS de responseFormat : on laisse le LLM produire du texte libre.
-        // Pour les transcriptions markdown longues, le mode JSON strict fait
-        // crasher certains endpoints (timeout sur génération contrainte
-        // >10K chars).
+        // NO responseFormat: we let the model produce free-form text. For
+        // long markdown transcriptions, strict JSON mode crashes some
+        // endpoints (timeout on constrained generation over 10K chars).
         numCtx: input.numCtx,
         maxRetries: input.maxRetries ?? 2,
         validateContent: (raw: string): ValidateResult<string> => ({
           ok: true,
           data: raw,
         }),
-        // Pas d'aggregateUsage → usage du dernier appel uniquement.
+        // No aggregateUsage → usage from the last call only.
         errorPrefix: "LLM completion",
       });
       return {

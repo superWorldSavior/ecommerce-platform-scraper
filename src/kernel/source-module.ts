@@ -1,29 +1,29 @@
 /**
- * Contrat déclaratif d'une source scrapée.
+ * Declarative contract of a scraped source.
  *
- * Chaque site expose une instance `SourceModule`. Un registry les agrège et les
- * phases du pipeline consomment les capacités déclarées ici. Le module est de la
- * **donnée**, pas du comportement : il décrit ce que le site sait faire, les
- * runners génériques décident quoi en faire.
+ * Each site exposes one `SourceModule` instance. A registry aggregates them,
+ * and the pipeline phases consume the capabilities declared here. The module is
+ * **data**, not behavior: it describes what the site can do, and the generic
+ * runners decide what to do with that.
  *
- * Avant d'écrire un adapter, regarder si le site tourne sur un moteur connu :
- * `platforms/shopline`, `platforms/cyberbiz`, `platforms/bvshop` composent les
- * defaults du moteur et ne laissent à déclarer que le spécifique du site.
+ * Before writing an adapter, check whether the site runs on a known engine:
+ * `platforms/shopline`, `platforms/cyberbiz` and `platforms/bvshop` assemble
+ * the engine's defaults and leave only the site-specific parts to declare.
  *
- * ## Deux paramètres de type
+ * ## Two type parameters
  *
- * - `TRole` — vocabulaire de rôles d'artefacts du domaine
- *   (cf `artifact-context.ts`). Défaut : les rôles e-commerce de base.
- * - `TFacts` — provider de faits structurés du domaine. Le kernel ne l'inspecte
- *   jamais ; il le transporte jusqu'à la couche qui sait le lire.
+ * - `TRole` — the domain's artifact role vocabulary (see
+ *   `artifact-context.ts`). Defaults to the base e-commerce roles.
+ * - `TFacts` — the domain's structured-facts provider. The kernel never
+ *   inspects it; it carries it through to the layer that knows how to read it.
  *
- * ## Champs required nullable
+ * ## Required nullable fields
  *
- * `imageCandidateSelector`, `catalogDiscovery` et les deux providers sont
- * **required mais nullable**. `null` signifie « absence assumée et auditée » ;
- * `undefined` est interdit. Ajouter un champ obligatoire ici fait donc échouer
- * la compilation sur toutes les sources qui l'omettent — inversion de contrôle
- * sans framework, et aucun oubli silencieux à l'ajout d'une source.
+ * `imageCandidateSelector`, `catalogDiscovery` and both providers are
+ * **required but nullable**. `null` means "deliberately absent and audited";
+ * `undefined` is forbidden. Adding a mandatory field here therefore breaks
+ * compilation on every source that omits it — inversion of control without a
+ * framework, and no silent omission when a source is added.
  */
 
 import type {
@@ -35,10 +35,10 @@ import type { CommercePlatform } from "./commerce-platform.ts";
 import type { PipelinePhase } from "./phases.ts";
 
 /**
- * Capacités de projection déclarées par source. Les deux champs sont required
- * et nullable : `null` = absence assumée, provider présent = extraction
- * structurée. La couche appelante décide du repli sur `null` (typiquement une
- * passe modèle).
+ * Projection capabilities declared per source. Both fields are required and
+ * nullable: `null` = deliberately absent, a provider = structured extraction.
+ * The calling layer decides what to fall back to on `null`, typically a model
+ * pass.
  */
 export interface ProjectionProviders<
   TRole extends string = BaseArtifactRole,
@@ -52,40 +52,41 @@ export interface SourceModule<
   TRole extends string = BaseArtifactRole,
   TFacts = unknown,
 > {
-  /** Identifiant lowercase ASCII, utilisé comme clé dans tout le pipeline. */
+  /** Lowercase ASCII identifier, used as the key across the whole pipeline. */
   readonly name: string;
 
   /**
-   * Hôte du site, tel qu'il apparaît dans l'arborescence de stockage brut :
+   * The site's host, as it appears in the raw storage tree:
    * `<rawRoot>/<rawHost>/<quarter>/products/*.html`.
    */
   readonly rawHost: string;
 
-  /** Moteur de boutique du site. `custom` si aucun moteur commun. */
+  /** The site's commerce engine. `custom` when there is no common engine. */
   readonly commercePlatform: CommercePlatform;
 
   /**
-   * Motif d'URL du CDN d'images du site. Sert à attribuer les images trouvées
-   * dans un HTML à la bonne source — deux sites peuvent citer les images l'un
-   * de l'autre.
+   * URL pattern of the site's image CDN. Used to attribute the images found in
+   * an HTML page to the right source — two sites can reference each other's
+   * images.
    */
   readonly imageUrlHint: RegExp;
 
   /**
-   * Capture du slug produit depuis l'URL canonique. Optionnel : une source sans
-   * ce champ ne supporte pas le filtrage automatique des URLs découvertes.
+   * Captures the product slug from the canonical URL. Optional: a source
+   * without this field does not support automatic filtering of discovered
+   * URLs.
    */
   readonly productUrlRegex?: RegExp;
 
-  /** Phases supportées. Optionnel : défaut à toutes (`PIPELINE_PHASES`). */
+  /** Supported phases. Optional: defaults to all (`PIPELINE_PHASES`). */
   readonly phases?: readonly PipelinePhase[];
 
   readonly projectionProviders: ProjectionProviders<TRole, TFacts>;
 
   /**
-   * Télémétrie read-only de la découverte d'images : compte les URLs classées
-   * par rôle pour mesurer la qualité du filtrage. N'influence pas le pipeline —
-   * pour le filtre actif, voir `imageCandidateSelector`. Optionnel.
+   * Read-only telemetry for image discovery: counts the URLs classified by
+   * role, to measure how well the filtering works. Has no influence on the
+   * pipeline — for the active filter, see `imageCandidateSelector`. Optional.
    */
   readonly imageDiscoveryUsefulnessAnalyzer?: (
     html: string,
@@ -93,17 +94,16 @@ export interface SourceModule<
   ) => ImageDiscoveryUsefulnessStats<TRole>;
 
   /**
-   * Sélection des images candidates avant l'OCR. Required, nullable : `null` =
-   * aucune sélection, toutes les candidates sont conservées. Required pour
-   * forcer chaque source à se prononcer — les sites d'un même moteur ont
-   * vocation à partager le même selector.
+   * Selects the candidate images to send to OCR. Required, nullable: `null` =
+   * no selection, every candidate is kept. Required so that each source has to
+   * take a position — sites on the same engine are meant to share the same
+   * selector.
    */
   readonly imageCandidateSelector: ImageCandidateSelector | null;
 
   /**
-   * Emplacements HTML secondaires à essayer si le principal est absent. Utile
-   * pour les sites qui gardent une archive en plus du catalogue courant.
-   * Optionnel.
+   * Secondary HTML locations to try when the primary one is missing. Useful for
+   * sites that keep an archive on top of the current catalog. Optional.
    */
   readonly htmlFallbackPathsFor?: (
     productId: string,
@@ -111,16 +111,15 @@ export interface SourceModule<
   ) => readonly string[];
 
   /**
-   * Fonctions de pipeline propres à la source, exposées aux runners génériques.
-   * Une source opte pour un runner en exposant le bundle correspondant ; sans
-   * le bundle requis, le runner échoue explicitement au lieu de deviner.
+   * Source-specific pipeline functions, exposed to the generic runners. A
+   * source opts into a runner by exposing the matching bundle; without the
+   * bundle it requires, the runner fails explicitly instead of guessing.
    */
   readonly pipelineFns?: SourcePipelineFns;
 
   /**
-   * Découverte du catalogue complet, au-delà d'une liste de candidats fournie.
-   * Required, nullable : `null` = la source n'expose pas de catalogue
-   * énumérable.
+   * Discovery of the full catalog, beyond a supplied candidate list. Required,
+   * nullable: `null` = the source exposes no enumerable catalog.
    */
   readonly catalogDiscovery: CatalogDiscoverySource | null;
 }
@@ -140,38 +139,37 @@ export interface MinimalReconciledSnapshot {
 }
 
 /**
- * Bundle download : configure la récupération des HTML vers le stockage brut.
- * Une source qui l'expose accepte le runner de download générique ; les autres
- * gardent leur propre chemin de récupération (proxy résidentiel, navigateur
- * piloté, réseau géo-restreint…).
+ * Download bundle: configures fetching HTML into raw storage. A source that
+ * exposes it accepts the generic download runner; the others keep a fetch path
+ * of their own (residential proxy, driven browser, geo-restricted network…).
  */
 export interface DownloadPipelineFns {
-  /** URL de base du site. Required : sert de racine aux URLs canoniques. */
+  /** The site's base URL. Required: it roots the canonical URLs. */
   readonly siteUrl: string;
   /**
-   * Construit l'URL canonique depuis un slug. Optionnel : défaut
-   * `${siteUrl}/products/${slug}`. Le builder doit encoder le slug lui-même.
+   * Builds the canonical URL from a slug. Optional: defaults to
+   * `${siteUrl}/products/${slug}`. The builder must encode the slug itself.
    */
   readonly productUrlForSlug?: (slug: string) => string;
   /**
-   * Slugs de découverte additionnels, chargés en best-effort. Cas d'usage :
-   * plusieurs enseignes servies par un même domaine.
+   * Extra discovery slugs, loaded best-effort. Use case: several storefronts
+   * served from a single domain.
    */
   readonly additionalDiscoverySlugs?: readonly string[];
 }
 
 /**
- * Bundle stage : `parsePages` et `buildStageSnapshot` sont required **ensemble**.
- * Une source ne peut exposer l'un sans l'autre — sinon un bundle présent mais
- * incomplet compilerait pour échouer au runtime.
+ * Stage bundle: `parsePages` and `buildStageSnapshot` are required
+ * **together**. A source cannot expose one without the other — otherwise a
+ * present but incomplete bundle would compile, only to fail at runtime.
  */
 export interface StagePipelineFns {
   readonly parsePages: (
     pages: ReadonlyArray<{ url: string; html: string }>,
   ) => {
     /**
-     * Produits parsés. La forme exacte varie par source, mais toutes exposent
-     * au moins `productId` — le runner s'en sert pour filtrer un sous-ensemble.
+     * Parsed products. The exact shape varies per source, but all of them
+     * expose at least `productId` — the runner uses it to filter a subset.
      */
     products: ReadonlyArray<{ readonly productId: string }>;
     skipped: {
@@ -187,7 +185,7 @@ export interface StagePipelineFns {
   ) => MinimalStageSnapshot;
 }
 
-/** Bundle reconcile : déduplication post-staging. */
+/** Reconcile bundle: post-staging deduplication. */
 export interface ReconcilePipelineFns {
   readonly reconcileSnapshot: (
     // deno-lint-ignore no-explicit-any
@@ -196,21 +194,21 @@ export interface ReconcilePipelineFns {
 }
 
 /**
- * Union discriminée encodant l'invariant **`stage` exige `download`**.
+ * Discriminated union encoding the invariant **`stage` requires `download`**.
  *
- * - Variante A — `{ reconcile? }` seul : la source n'utilise les runners
- *   génériques que pour la déduplication. `download` et `stage` interdits.
- * - Variante B — `{ download, stage?, reconcile? }` : `download` required,
- *   le reste opt-in.
+ * - Variant A — `{ reconcile? }` alone: the source only uses the generic
+ *   runners for deduplication. `download` and `stage` are forbidden.
+ * - Variant B — `{ download, stage?, reconcile? }`: `download` required, the
+ *   rest opt-in.
  *
- * `{ stage }` sans `download` est rejeté à la compilation : le staging
- * reconstruit les URLs canoniques depuis `download.siteUrl` +
- * `productUrlForSlug`. Sans la configuration d'URL, le design est invalide —
- * autant l'apprendre du compilateur que d'une exécution.
+ * `{ stage }` without `download` is rejected at compile time: staging rebuilds
+ * the canonical URLs from `download.siteUrl` and `productUrlForSlug`. Without
+ * that URL configuration the design is invalid — better to hear it from the
+ * compiler than from a run.
  *
- * Les **sorties** des fonctions sont typées strictement. Les **entrées**
- * restent `any` pour que chaque source déclare ses vraies fonctions typées sans
- * bataille de variance sur les paramètres.
+ * Function **outputs** are strictly typed. **Inputs** stay `any` so that each
+ * source can declare its own properly typed functions without a variance fight
+ * over parameters.
  */
 export type SourcePipelineFns =
   | {
@@ -225,32 +223,31 @@ export type SourcePipelineFns =
   };
 
 /**
- * Stratégie de découverte du catalogue complet d'une source.
+ * Strategy for discovering a source's full catalog.
  *
- * `productUrlRegex` est required ici, contrairement au champ homonyme optionnel
- * de `SourceModule` : la dépendance « découvrir exige de savoir filtrer les
- * entrées du sitemap » est encodée au compile-time. Les deux champs ont des
- * sémantiques distinctes ; une source qui fait les deux les duplique
- * explicitement.
+ * `productUrlRegex` is required here, unlike the same-named optional field on
+ * `SourceModule`: the dependency "discovering requires knowing how to filter
+ * sitemap entries" is encoded at compile time. The two fields have distinct
+ * semantics; a source that does both duplicates them explicitly.
  */
 export type CatalogDiscoverySource = {
   readonly kind: "sitemap";
-  /** URL d'un `sitemap.xml` ou `sitemapindex.xml` (récursion bornée). */
+  /** URL of a `sitemap.xml` or `sitemapindex.xml` (bounded recursion). */
   readonly url: string;
-  /** Capture du slug produit depuis une entrée de sitemap. */
+  /** Captures the product slug from a sitemap entry. */
   readonly productUrlRegex: RegExp;
   /**
-   * Motifs appliqués au slug décodé pour écarter les produits hors périmètre
-   * avant tout fetch. Économise le quota OCR et les appels modèle sur des pages
-   * qu'on jetterait ensuite. Optionnel : absence = aucun filtre.
+   * Patterns applied to the decoded slug to drop out-of-scope products before
+   * any fetch. Saves OCR quota and model calls on pages that would be thrown
+   * away afterwards. Optional: absent = no filter.
    */
   readonly excludedSlugPatterns?: readonly RegExp[];
 };
 
 /**
- * Statistiques d'un analyseur d'utilité de découverte d'images. Défini ici pour
- * éviter un cycle d'import avec le module de découverte d'images, qui consomme
- * le registry de sources.
+ * Statistics from an image discovery usefulness analyzer. Declared here to
+ * avoid an import cycle with the image discovery module, which consumes the
+ * source registry.
  */
 export interface ImageDiscoveryUsefulnessStats<TRole extends string> {
   imageUrlsTotal: number;

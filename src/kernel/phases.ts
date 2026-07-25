@@ -1,19 +1,19 @@
 /**
- * Phases du pipeline de scraping, dans l'ordre d'exécution.
+ * Scraping pipeline phases, in execution order.
  *
- * Une source déclare les phases qu'elle supporte via `SourceModule.phases` ;
- * l'absence du champ vaut « toutes les phases ». Défini dans son propre module
- * pour que le contrat `SourceModule` puisse référencer le type sans cycle
- * d'import.
+ * A source declares which phases it supports through `SourceModule.phases`; an
+ * absent field means "every phase". Defined in its own module so that the
+ * `SourceModule` contract can reference the type without an import cycle.
  *
- *  - `download` — récupère le HTML brut vers le stockage local.
- *  - `stage` — parse le HTML en enregistrements structurés.
- *  - `reconcile` — déduplique et fusionne les enregistrements du staging.
- *  - `transcribe-html` / `transcribe-images` — passes d'enrichissement,
- *    respectivement sur le texte et sur les images (OCR, modèle vision).
- *  - `apply-projections` — projette les faits extraits vers le modèle métier.
- *  - `score` — calcul dérivé propre au domaine du consommateur.
- *  - `project` — écriture finale vers la destination.
+ *  - `download` — fetches the raw HTML into local storage.
+ *  - `stage` — parses the HTML into structured records.
+ *  - `reconcile` — deduplicates and merges the staged records.
+ *  - `transcribe-html` / `transcribe-images` — enrichment passes, over text and
+ *    over images respectively (OCR, vision model).
+ *  - `apply-projections` — projects the extracted facts onto the business
+ *    model.
+ *  - `score` — derived computation specific to the consumer's domain.
+ *  - `project` — final write to the destination.
  */
 export const PIPELINE_PHASES = [
   "download",

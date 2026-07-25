@@ -194,16 +194,15 @@ export function imageCandidateUrlLookupVariants(url: string): string[] {
 }
 
 /**
- * Pattern d'URL des deux CDN Shopline qu'un site Shopline peut servir :
- *  - `img.shoplineapp.com/media/image_clips/` : packshots Product JSON-LD
- *    (ancien CDN, lazyload header).
- *  - `shoplineimg.com/<store>/<image>/<size>x.<ext>` : slides body HTML
- *    (composition, posologie, marketing — moderne).
+ * URL pattern for the two Shopline CDNs a Shopline site can serve from:
+ *  - `img.shoplineapp.com/media/image_clips/`: Product JSON-LD packshots
+ *    (the older CDN, lazyload header).
+ *  - `shoplineimg.com/<store>/<image>/<size>x.<ext>`: body HTML slides
+ *    (composition, dosage, marketing — the modern one).
  *
- * Consommé via `BrandModule.imageUrlHint` par
- * `lib/extraction/image/discovery.ts` pour attribuer les URLs HTML à la
- * bonne source. Un site qui ne sert que `img.shoplineapp.com` (cas
- * un seul de ces CDN garde son propre `imageUrlHint`, plus restrictif.
+ * Consumed through `imageUrlHint` by the image discovery layer to attribute
+ * HTML URLs to the right source. A site that serves from only one of these two
+ * CDNs keeps an `imageUrlHint` of its own, more restrictive.
  */
 export const SHOPLINE_DUAL_CDN_IMAGE_URL_HINT =
   /img\.shoplineapp\.com\/media\/image_clips\/|shoplineimg\.com\//i;
@@ -351,17 +350,15 @@ const SHOPLINE_HOST_RE = /(?:img\.shoplineapp\.com|shoplineimg\.com)/i;
 export const SHOPLINE_TINY_IMAGE_DEFAULT_THRESHOLD = 96;
 
 /**
- * Drop pour les sites Shopline les URLs `<id>/<N>x.<ext>` avec
- * N < threshold. Les images de cette taille sont des icones UI / boutons
- * decoratifs, et font paniquer qwen3-vl `SmartResize` sur des images plus
- * petites que factor:32. Helper composable, pas un default global :
- * uniquement les sources qui declarent un `imageCandidateSelector`
- * referencant ce filtre l'appliquent.
+ * On Shopline sites, drops the `<id>/<N>x.<ext>` URLs where N < threshold.
+ * Images that small are UI icons and decorative buttons, and they make the
+ * vision model's `SmartResize` panic on anything smaller than factor:32. A
+ * composable helper, not a global default: it only applies to the sources
+ * whose `imageCandidateSelector` references this filter.
  *
- * Le filtre vérifie d'abord le host (Shopline 2-CDN) avant le pattern
- * sized — un autre CDN qui sert par hasard `/24x.png` (icône) ne doit
- * pas être affecté. Cohérent avec le naming "Shopline" du helper (S7/F8
- * du plan session-end).
+ * The filter checks the host (Shopline's two CDNs) before the sized pattern —
+ * another CDN that happens to serve a `/24x.png` icon must not be affected.
+ * Consistent with the helper's "Shopline" naming.
  */
 export function dropTinyShoplineImages(
   threshold: number = SHOPLINE_TINY_IMAGE_DEFAULT_THRESHOLD,
@@ -384,11 +381,11 @@ export function dropTinyShoplineImages(
 }
 
 /**
- * Capture l'`image_id` Shopline (le hash CDN qui identifie une image
- * indépendamment de sa taille de resize). Pattern :
- * `<base>/<image_id>/<size>x.<ext>` où `<image_id>` est un hex SHA-style.
- * Retourne null si l'URL ne match pas le pattern Shopline sized
- * (ex : `/original.<ext>` ou autre CDN).
+ * Captures the Shopline `image_id` — the CDN hash that identifies an image
+ * independently of its resize dimensions. Pattern:
+ * `<base>/<image_id>/<size>x.<ext>`, where `<image_id>` is a SHA-style hex
+ * string. Returns null when the URL does not match the Shopline sized pattern
+ * (`/original.<ext>`, say, or a different CDN).
  */
 const SHOPLINE_IMAGE_ID_URL_RE =
   /\/([a-f0-9]{20,})\/(\d+)x\.(?:jpe?g|png|webp)/i;
@@ -404,38 +401,37 @@ export function parseShoplineSizedUrl(
 }
 
 /**
- * Dédupe les URLs Shopline par `image_id` : pour chaque image_id rencontré,
- * garde uniquement la version au plus grand `<N>x` (la plus précise). Les
- * autres versions de la même image_id sont droppées comme `"duplicate"`.
+ * Deduplicates Shopline URLs by `image_id`: for every image_id encountered,
+ * keeps only the version at the largest `<N>x` (the most detailed one). The
+ * other versions of the same image_id are dropped as `"duplicate"`.
  *
- * Les URLs qui ne matchent pas le pattern Shopline sized
- * (ex: `/original.<ext>`) sont gardées telles quelles — chacune est
- * implicitement son propre groupe.
+ * URLs that do not match the Shopline sized pattern (`/original.<ext>`, say)
+ * are kept as they are — each is implicitly its own group.
  *
- * Combiné à `dropTinyShoplineImages`, divise massivement le volume OCR sur
- * Shopline : une fiche typique avec 23 URLs distinctes peut contenir 8-10
- * `image_id` uniques après dédupe.
+ * Combined with `dropTinyShoplineImages`, this cuts OCR volume on Shopline
+ * dramatically: a typical product page with 23 distinct URLs may hold only
+ * 8-10 unique `image_id`s once deduplicated.
  */
 /**
- * Selector pré-OCR composé, commun à tous les sites Shopline. Chaîne :
+ * Composed pre-OCR selector, shared by every Shopline site. The chain:
  *
  *   1. Exact URL dedup
- *   2. `dropTinyShoplineImages()` — drop icônes UI (<96px) qui font paniquer
- *      qwen3-vl SmartResize.
- *   3. `dedupeShoplineImagesById()` — pour chaque image_id Shopline, garde
- *      uniquement la version au plus grand resize (la plus précise).
+ *   2. `dropTinyShoplineImages()` — drops the UI icons (<96px) that make the
+ *      vision model's SmartResize panic.
+ *   3. `dedupeShoplineImagesById()` — for each Shopline image_id, keeps only
+ *      the version at the largest resize (the most detailed one).
  *
- * Usage typique dans `mod.ts` :
+ * Typical use in `mod.ts`:
  *   ```ts
  *   import { selectShoplineImageCandidates } from "../kernel/image-candidates.ts";
  *   export const source = {
  *     ...
  *     imageCandidateSelector: selectShoplineImageCandidates,
- *   } satisfies BrandModule;
+ *   } satisfies SourceModule;
  *   ```
  *
- * Un site Shopline avec des besoins spécifiques (ex: drop tous les hero
- * images) peut composer ses propres primitives ou wrapper celle-ci.
+ * A Shopline site with specific needs — dropping every hero image, say — can
+ * compose primitives of its own or wrap this one.
  */
 export const selectShoplineImageCandidates: ImageCandidateSelector = (
   input: ImageCandidateSelectorInput,

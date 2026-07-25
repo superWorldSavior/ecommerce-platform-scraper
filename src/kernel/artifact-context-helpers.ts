@@ -1,5 +1,5 @@
 /**
- * Raccourci pour le cas le plus fréquent de classification d'artefacts.
+ * Shortcut for the most common artifact classification case.
  */
 
 import type {
@@ -10,14 +10,15 @@ import type {
 } from "./artifact-context.ts";
 
 /**
- * Construit un `ArtifactContextProvider` quand le rôle d'un artefact se déduit
- * de l'artefact **seul** — sans regarder ses voisins, et sans entrée/sortie.
+ * Builds an `ArtifactContextProvider` for the case where an artifact's role
+ * follows from the artifact **alone** — without looking at its neighbors, and
+ * without any I/O.
  *
- * C'est le cas courant : une image dont l'URL contient `nutrition-facts` se
- * classe sans rien savoir du reste de la page. Les sources qui ont besoin d'un
- * contexte croisé (« la dernière slide du carrousel ») ou d'une lecture disque
- * écrivent leur provider à la main : ce helper ne pourrait pas les servir sans
- * devenir un cadre à part entière.
+ * That is the common case: an image whose URL contains `nutrition-facts` can be
+ * classified without knowing anything about the rest of the page. Sources that
+ * need cross-artifact context ("the last slide of the carousel") or a disk read
+ * write their provider by hand: this helper could not serve them without
+ * turning into a framework of its own.
  *
  * ```ts
  * projectionProviders: {
@@ -30,12 +31,12 @@ import type {
  * }
  * ```
  *
- * `selectionMode` :
- *  - `"role-filtered"` (défaut) — la sélection filtre par rôle selon les
- *    préférences du vocabulaire.
- *  - `"full"` — tous les artefacts sont transmis ; la classification n'est
- *    conservée que pour l'audit. Utile pour calibrer un classifieur neuf sans
- *    risquer de perdre du contexte.
+ * `selectionMode`:
+ *  - `"role-filtered"` (the default) — selection filters by role, following
+ *    the vocabulary's preferences.
+ *  - `"full"` — every artifact is passed through; the classification is kept
+ *    for auditing only. Useful to calibrate a new classifier without risking
+ *    any loss of context.
  */
 export function createPerArtifactContextProvider<
   TRole extends string,

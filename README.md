@@ -234,6 +234,22 @@ Copy `.env.example`. Four variables are required — `LLM_API_KEY`,
 `LLM_BASE_URL`, `LLM_MODEL`, `LLM_VISION_MODEL` — and a missing one fails at
 startup rather than mid-run. `LLM_REQUEST_TIMEOUT_MS` is the only optional one.
 
+**Local or hosted, same code.** `LLM_BASE_URL` points at any OpenAI-compatible
+API, so a local runtime (`http://localhost:11434/v1`), a self-hosted server, or
+a hosted provider are all the same to the toolkit. Moving between them is one
+environment variable.
+
+**Two model slots, routed automatically.** `LLM_MODEL` handles text,
+`LLM_VISION_MODEL` handles calls that carry an image, and the client picks
+between them on whether an image is present. They are separate so that changing
+one cannot silently affect the other.
+
+Both are read from the environment when the client is constructed, so a single
+process runs one provider and one model pair at a time. Running two providers
+side by side, or picking a cheaper model per call site, would need the
+configuration passed in rather than read from the environment — worth knowing
+before you plan around it.
+
 `LLM_BASE_URL` has **no default** on purpose. A silent fallback could send your
 data to a provider you never chose, which is a worse outcome than an error
 message on the first call.

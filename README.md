@@ -33,19 +33,27 @@ vocabulary, the extraction schema and the output model are all yours.
 
 Requires [Deno](https://deno.com/) 2.x.
 
-```ts
-import {
-  defineShoplineSource,
-  PoliteFetcher,
-} from "jsr:@casys/ecommerce-platform-scraper";
+Not published to a registry yet — clone it and import from source:
+
+```bash
+git clone <this-repo> ecommerce-platform-scraper
+cd ecommerce-platform-scraper
+deno task check   # fmt, lint, type-check, tests
 ```
+
+```ts
+import { defineShoplineSource, PoliteFetcher } from "./src/mod.ts";
+```
+
+Once published the specifier becomes `jsr:@casys/ecommerce-platform-scraper`;
+the scaffold already emits that form, overridable with `--import`.
 
 ## Quick start
 
 Declare a source on a supported platform:
 
 ```ts
-import { defineShoplineSource } from "./src/platforms/shopline.ts";
+import { defineShoplineSource } from "./src/mod.ts";
 
 export const source = defineShoplineSource({
   name: "example",
@@ -57,7 +65,7 @@ export const source = defineShoplineSource({
 });
 ```
 
-The Shopline defaults — dual-CDN image hint, pre-OCR image selector, sitemap
+The SHOPLINE defaults — dual-CDN image hint, pre-OCR image selector, sitemap
 discovery at `/sitemap.xml` — are filled in. Overrides win over defaults.
 
 Crawl politely, and check `robots.txt` while you're at it:
@@ -72,9 +80,14 @@ const fetcher = new PoliteFetcher({
   minIntervalMs: 1_000,
 });
 
-const rules = parseRobotsTxt(await (await fetch(robotsUrl)).text());
-if (!isDisallowed(rules, "/products/")) {
-  const page = await fetcher.fetchText(productUrl);
+// Same fetcher for robots.txt as for the pages: the courtesy applies to both.
+const rules = parseRobotsTxt(
+  await fetcher.fetchText("https://shop.example.test/robots.txt"),
+);
+
+const path = "/products/thing";
+if (!isDisallowed(rules, path)) {
+  const html = await fetcher.fetchText(`https://shop.example.test${path}`);
 }
 ```
 
@@ -131,17 +144,15 @@ One command from a URL to a skeleton that compiles. `--name` is the one thing it
 will not invent: the identifier is yours to choose, and guessing it from a
 hostname produces something you rename immediately.
 
-Otherwise, run the scaffold on its own:
-
-`deno task scaffold` asks a handful of questions and writes a `SourceModule`
-skeleton — every field present, each one annotated with the primitive that
-belongs there.
+To review the answers first, or to scaffold without inspecting anything, run it
+on its own. It asks a handful of questions and writes the same skeleton — every
+field present, each annotated with the primitive that belongs there:
 
 ```
 deno task scaffold --out sources/example/mod.ts
 ```
 
-Answers can also be passed as flags, so the same command works unattended:
+Every answer is also a flag, so the same command works unattended in a script:
 
 ```
 deno task scaffold --yes --name example --host shop.example.test \
@@ -183,15 +194,17 @@ which is why its factory _does_ default it.
 ## Architecture
 
 ```
-kernel/          source contract, discovery, sitemap, HTTP, raw storage,
+src/
+  kernel/        source contract, discovery, sitemap, HTTP, raw storage,
                  image candidates, artifact context
-  llm/           multi-model client, text/vision routing, typed errors
-  ocr/           OcrProvider interface + Apple Vision implementation
-platforms/       shopline · bvshop · cyberbiz
-presets/         reusable strategies, named by shape not by site
-locales/         zh-TW OCR quality checks
-cli/             inspect · primitives · scaffold
+    llm/         multi-model client, text/vision routing, typed errors
+    ocr/         OcrProvider interface + Apple Vision implementation
+  platforms/     shopline · bvshop · cyberbiz
+  presets/       reusable strategies, named by shape not by site
+  locales/       zh-TW OCR quality checks
+  cli/           inspect · primitives · scaffold
 docs/            choosing-primitives: filling in the skeleton
+tests/
 ```
 
 Two ideas carry the design.
@@ -202,6 +215,8 @@ label" role, scraping components needs "datasheet". So the kernel owns
 classification, selection and fallback, and you supply the vocabulary:
 
 ```ts
+import { BASE_ARTIFACT_ROLES, defineRoleVocabulary } from "./src/mod.ts";
+
 const vocabulary = defineRoleVocabulary({
   roles: [...BASE_ARTIFACT_ROLES, "datasheet"],
   preferences: { specs: ["html", "datasheet", "product-description"] },
@@ -215,9 +230,13 @@ OpenAI-compatible endpoint. What varies by deployment is injected, not assumed.
 
 ## Configuration
 
-Copy `.env.example`. All four LLM variables are required — including
-`LLM_BASE_URL`, which has **no default** on purpose: a silent fallback could
-send your data to a provider you never chose.
+Copy `.env.example`. Four variables are required — `LLM_API_KEY`,
+`LLM_BASE_URL`, `LLM_MODEL`, `LLM_VISION_MODEL` — and a missing one fails at
+startup rather than mid-run. `LLM_REQUEST_TIMEOUT_MS` is the only optional one.
+
+`LLM_BASE_URL` has **no default** on purpose. A silent fallback could send your
+data to a provider you never chose, which is a worse outcome than an error
+message on the first call.
 
 ## Known limits
 

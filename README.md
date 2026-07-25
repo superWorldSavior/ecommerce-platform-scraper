@@ -105,6 +105,11 @@ whereas a factory hides code you never write. For a site with no shared engine
 there is nothing to hide, so the skeleton shows everything. What it cannot do is
 guess how your site's HTML yields a product — that part stays yours.
 
+The skeleton comes out with `null` in every capability field, which is a valid
+answer rather than a placeholder.
+**[Choosing primitives](docs/choosing-primitives.md)** is how you decide what to
+put there, and when leaving `null` is the right call.
+
 ## Platform support
 
 | Platform     | What ships                                                                                    | Maturity                                                                               |
@@ -133,6 +138,7 @@ platforms/       shopline · bvshop · cyberbiz
 presets/         reusable strategies, named by shape not by site
 locales/         zh-TW OCR quality checks
 cli/             scaffold: renders a SourceModule skeleton
+docs/            choosing-primitives: filling in the skeleton
 ```
 
 Two ideas carry the design.

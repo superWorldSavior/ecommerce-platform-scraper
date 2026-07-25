@@ -78,7 +78,47 @@ if (!isDisallowed(rules, "/products/")) {
 }
 ```
 
-## Scaffolding a new source
+## Adding a source
+
+Three commands, in order. Each one answers a question the next would otherwise
+make you guess.
+
+### 1. Look at a real page
+
+```
+deno task inspect https://shop.example.test/products/thing
+```
+
+Reports what the page actually contains: which commerce engine (from the image
+hosts), whether a Product JSON-LD block is present, the product path shape,
+lazy-loaded image count, filenames that look like a regulatory label. It ends by
+printing the `scaffold` command its observations imply.
+
+Everything it prints is an observation with a stated reason — never a guess. If
+a signal is absent it says so rather than filling in a plausible default. Pass
+`--file page.html --url <url>` to analyse a page you already saved, and `--json`
+for machine-readable output.
+
+Confirm against a second product page before committing a hint. One page is not
+a pattern.
+
+### 2. Ask what already exists
+
+```
+deno task primitives                    # everything, grouped by axis
+deno task primitives --axis images      # one axis
+deno task primitives --search robots    # substring over names and summaries
+```
+
+Run this before writing anything local. The failure it exists to prevent is
+reimplementing a primitive that was already there — which happens because
+documentation gets skimmed, not because anyone decided to.
+
+A test asserts the catalogue and the public exports describe exactly the same
+set of symbols, so adding an export without cataloguing it fails the suite. That
+is what makes the answer worth trusting.
+
+### 3. Generate the skeleton
 
 `deno task scaffold` asks a handful of questions and writes a `SourceModule`
 skeleton — every field present, each one annotated with the primitive that
@@ -137,7 +177,7 @@ kernel/          source contract, discovery, sitemap, HTTP, raw storage,
 platforms/       shopline · bvshop · cyberbiz
 presets/         reusable strategies, named by shape not by site
 locales/         zh-TW OCR quality checks
-cli/             scaffold: renders a SourceModule skeleton
+cli/             inspect · primitives · scaffold
 docs/            choosing-primitives: filling in the skeleton
 ```
 

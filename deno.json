@@ -4,7 +4,9 @@
   "exports": "./src/mod.ts",
   "tasks": {
     "check": "deno fmt --check . && deno lint . && deno check src/ && deno test -A",
-    "scaffold": "deno run --allow-read --allow-write src/cli/scaffold.ts"
+    "scaffold": "deno run --allow-read --allow-write src/cli/scaffold.ts",
+    "primitives": "deno run src/cli/primitives.ts",
+    "inspect": "deno run --allow-net --allow-read src/cli/inspect.ts"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@^1",

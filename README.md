@@ -78,6 +78,33 @@ if (!isDisallowed(rules, "/products/")) {
 }
 ```
 
+## Scaffolding a new source
+
+`deno task scaffold` asks a handful of questions and writes a `SourceModule`
+skeleton — every field present, each one annotated with the primitive that
+belongs there.
+
+```
+deno task scaffold --out sources/example/mod.ts
+```
+
+Answers can also be passed as flags, so the same command works unattended:
+
+```
+deno task scaffold --yes --name example --host shop.example.test \
+  --platform shopline --out sources/example/mod.ts
+```
+
+Two shapes come out of it. On a **known engine** you get a call to that engine's
+factory, declaring only what the engine cannot infer. On **custom** you get the
+full contract spelled out, because there is no engine to inherit from and
+nothing can be filled in for you.
+
+Note the difference from a factory: a scaffold generates code you then edit,
+whereas a factory hides code you never write. For a site with no shared engine
+there is nothing to hide, so the skeleton shows everything. What it cannot do is
+guess how your site's HTML yields a product — that part stays yours.
+
 ## Platform support
 
 | Platform     | What ships                                                                                    | Maturity                                                                               |
@@ -105,6 +132,7 @@ kernel/          source contract, discovery, sitemap, HTTP, raw storage,
 platforms/       shopline · bvshop · cyberbiz
 presets/         reusable strategies, named by shape not by site
 locales/         zh-TW OCR quality checks
+cli/             scaffold: renders a SourceModule skeleton
 ```
 
 Two ideas carry the design.

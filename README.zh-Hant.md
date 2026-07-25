@@ -72,6 +72,29 @@ if (!isDisallowed(rules, "/products/")) {
 }
 ```
 
+## 為新來源產生骨架
+
+`deno task scaffold` 會問你幾個問題，然後寫出一份 `SourceModule`
+骨架——每個欄位都在，並且逐一註明了該處該用的原語。
+
+```
+deno task scaffold --out sources/example/mod.ts
+```
+
+答案也可以用命令列旗標傳進去，所以同一道命令也能無人看顧地跑起來：
+
+```
+deno task scaffold --yes --name example --host shop.example.test \
+  --platform shopline --out sources/example/mod.ts
+```
+
+它產出的形態有兩種。在**已知引擎**上，你拿到的是一次對該引擎工廠函式的呼叫，只宣告引擎推斷不出來的部分。在
+**custom**
+上，你拿到的是完整契約的逐項攤開，因為沒有引擎可以繼承，也沒有任何東西能替你填好。
+
+注意它和工廠函式的差別：骨架產生器產生出程式碼，之後由你去改；而工廠函式藏起來的是你永遠不必寫的程式碼。對於沒有共用引擎的網站，沒有什麼可藏的，所以骨架會把每一項都攤開來給你看。它做不到的是猜出你的網站的
+HTML 怎麼產出一件商品——這部分仍然是你的工作。
+
 ## 平台支援
 
 | 平台         | 提供什麼                                                                       | 成熟度                                                                       |
@@ -96,6 +119,7 @@ kernel/          source contract, discovery, sitemap, HTTP, raw storage,
 platforms/       shopline · bvshop · cyberbiz
 presets/         reusable strategies, named by shape not by site
 locales/         zh-TW OCR quality checks
+cli/             scaffold: renders a SourceModule skeleton
 ```
 
 整個設計由兩個想法撐起來。

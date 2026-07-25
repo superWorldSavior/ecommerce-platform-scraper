@@ -351,8 +351,9 @@ export const SHOPLINE_TINY_IMAGE_DEFAULT_THRESHOLD = 96;
 
 /**
  * On Shopline sites, drops the `<id>/<N>x.<ext>` URLs where N < threshold.
- * Images that small are UI icons and decorative buttons, and they make the
- * vision model's `SmartResize` panic on anything smaller than factor:32. A
+ * Images that small are UI icons and decorative buttons, and they crash some
+ * vision models outright — `qwen3-vl` panics in `SmartResize` on anything
+ * below factor:32. A
  * composable helper, not a global default: it only applies to the sources
  * whose `imageCandidateSelector` references this filter.
  *
@@ -416,8 +417,8 @@ export function parseShoplineSizedUrl(
  * Composed pre-OCR selector, shared by every Shopline site. The chain:
  *
  *   1. Exact URL dedup
- *   2. `dropTinyShoplineImages()` — drops the UI icons (<96px) that make the
- *      vision model's SmartResize panic.
+ *   2. `dropTinyShoplineImages()` — drops the UI icons (<96px) that crash
+ *      `qwen3-vl` in SmartResize.
  *   3. `dedupeShoplineImagesById()` — for each Shopline image_id, keeps only
  *      the version at the largest resize (the most detailed one).
  *

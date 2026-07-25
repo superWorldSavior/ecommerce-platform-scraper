@@ -6,8 +6,9 @@
  * `<loc>...</loc>`. Enough for the sitemaps seen in the wild (SHOPLINE among
  * them) and robust against the assorted XML wrappers around them.
  *
- * Handles nested sitemapindex documents: `collectIndexChildren(xml)` returns
- * the child sitemap URLs that still have to be fetched separately.
+ * Nested sitemapindex documents are handled by `splitSitemap()`, which reports
+ * child sitemap URLs separately from product URLs, leaving the caller to decide
+ * how deep to recurse.
  */
 
 export interface SitemapSplit {

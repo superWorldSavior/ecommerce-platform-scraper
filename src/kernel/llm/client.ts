@@ -334,9 +334,9 @@ function selectModel(
 }
 
 /**
- * Some hosted models wrap the JSON in markdown fences despite `json_object`
- * mode. Strips one enclosing pair of fences; leaves any other content
- * untouched (`JSON.parse` will be the judge).
+ * Some models wrap the JSON in markdown fences despite `json_object` mode —
+ * `gemma` does it reliably. Strips one enclosing pair of fences and leaves any
+ * other content untouched (`JSON.parse` will be the judge).
  */
 function stripMarkdownFences(raw: string): string {
   const match = raw.trim().match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);

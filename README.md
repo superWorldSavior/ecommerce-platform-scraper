@@ -4,24 +4,30 @@
 
 Scraping toolkit for e-commerce storefronts, organised **by platform**.
 
-Most storefronts don't run on bespoke code — they run on a commerce SaaS. Sites
-sharing an engine share URL shapes, CDN patterns, sitemap layout and gallery
-markup. This toolkit treats that engine as the unit of reuse: you declare which
-platform a site runs on, inherit its defaults, and override only what's actually
-different.
+On a product page, the part that matters is often a photo. Specifications,
+composition, regulatory notices — printed on the back of the box, and never
+written into the HTML. A scraper that only reads markup leaves those fields
+empty, and rarely says so. This one goes after them.
+
+The second idea is reuse. Most storefronts don't run on bespoke code — they run
+on a commerce SaaS, and sites sharing an engine share URL shapes, CDN patterns,
+sitemap layout and gallery markup. Declare which platform a site runs on,
+inherit its defaults, override only what's actually different.
 
 It is **domain-agnostic**. Nothing here knows what you're extracting — the role
 vocabulary, the extraction schema and the output model are all yours.
 
 ## Why it might interest you
 
+- **It knows which image is worth reading.** A product page carries dozens; the
+  one holding the data sits among marketing slides. Interface, promotional,
+  decorative and duplicate assets are dropped — each with a stated reason —
+  before a single vision call is paid for.
+- **Multimodal and multi-model.** Text goes to one model, images to a separate
+  vision model, over any OpenAI-compatible endpoint. Swapping provider or model
+  is environment configuration, not a code change.
 - **Platform adapters, not site scripts.** Onboarding a site on a supported
   engine is a declaration, not a new parser.
-- **Multimodal and multi-model.** Regulatory and spec information often lives in
-  an _image_ — a photo of the back of the box — not in the HTML. The toolkit
-  routes text to one model and images to a separate vision model, over any
-  OpenAI-compatible endpoint. Swapping provider or model is environment
-  configuration, not a code change.
 - **Explicit absence.** Capability fields are required-but-nullable: `null`
   means "deliberately absent and audited". Adding a capability to the contract
   breaks compilation on every source that forgot it, so nothing is silently
@@ -157,7 +163,7 @@ tagged with the roles _you_ defined, plus the accounting of what was dropped.
       "id": "a3f",
       "artifactKind": "image",
       "sourceUrl": "https://img.shoplineapp.com/…/label-back.jpg",
-      "rawMarkdown": "| Vitamin C | 500 mg |\n| Zinc | 15 mg |",
+      "rawMarkdown": "| Net weight | 250 g |\n| Origin | Taiwan |",
       "capturedAt": "2026-07-26T09:14:00.000Z"
     }
   ],

@@ -61,6 +61,8 @@ export const source = defineShoplineSource({
   productUrlRegex: /^https:\/\/shop\.example\.test\/products\/([^/?#]+)/u,
   // imageCandidateSelector omitted on purpose: omitting it takes the engine
   // default. Passing `null` would mean "deliberately no selection".
+  // Both projection providers null: no custom classification, no custom
+  // extractor — see "What you get out" for what they replace.
   projectionProviders: { artifactContext: null, structuredFacts: null },
   pipelineFns: { download: { siteUrl: "https://shop.example.test" } },
 });
@@ -91,6 +93,75 @@ if (!isDisallowed(rules, path)) {
   const html = await fetcher.fetchText(`https://shop.example.test${path}`);
 }
 ```
+
+## What you get out
+
+Worth being blunt about, because it decides whether this toolkit is the one you
+want: **it does not hand you your data. It hands you the context to extract it
+from.**
+
+The pipeline runs in eight phases:
+
+```
+download → stage → reconcile → transcribe-html → transcribe-images
+         → apply-projections → score → project
+```
+
+A source declares which ones it supports (`SourceModule.phases`; absent means
+all of them). The first five are the toolkit's: fetch the pages, parse them into
+records, deduplicate, then enrich over text and over images — OCR and the vision
+model land here. `score` and `project` are yours, and the toolkit knows nothing
+about them.
+
+The handover happens at `apply-projections`. `selectProjectionContext()` returns
+a `ProjectionContext`: the page fragments that survived classification, each
+tagged with the roles _you_ defined, plus the accounting of what was dropped.
+
+```jsonc
+{
+  "projection": "specs",
+  "providerName": "per-artifact",
+  "artifacts": [
+    {
+      "id": "a3f",
+      "artifactKind": "image",
+      "sourceUrl": "https://img.shoplineapp.com/…/label-back.jpg",
+      "rawMarkdown": "| Vitamin C | 500 mg |\n| Zinc | 15 mg |",
+      "capturedAt": "2026-07-26T09:14:00.000Z"
+    }
+  ],
+  "classifiedArtifacts": [
+    { "roles": ["certificate"], "reason": "filename matched label pattern" }
+  ],
+  "stats": {
+    "selected": 1,
+    "dropped": 11,
+    "roles": { "certificate": 1, "promo": 6, "ui": 5 },
+    "charsBefore": 48000,
+    "charsAfter": 320
+  },
+  "fallbackReason": null
+}
+```
+
+Read `stats` as the point of the exercise: 48 000 characters of page reduced to
+the 320 that carry the answer. That is what you send to a model, and it is why
+the extraction costs cents rather than dollars.
+
+`fallbackReason` is the honesty valve. `NO_PROVIDER`, `CLASSIFICATION_EMPTY`,
+`NO_SELECTED_ARTIFACTS` and `PROVIDER_FALLBACK` each mean "you are getting the
+unfiltered page" — degraded, never silent.
+
+**The last step is yours**, and deliberately so. Turning that context into typed
+objects means calling the LLM client with your own schema; the toolkit ships the
+client and the routing, not the schema. Declaring `structuredFacts` on a source
+replaces that model pass with your own deterministic extractor, wherever the
+site's markup makes one possible.
+
+So the honest summary: this gets you from a URL to a small, role-tagged, audited
+context, on any number of sites sharing an engine. What that context _means_
+stays your problem — which is exactly what makes the toolkit reusable outside
+the domain it grew up in.
 
 ## Adding a source
 
@@ -123,6 +194,7 @@ a pattern.
 deno task primitives                    # everything, grouped by axis
 deno task primitives --axis images      # one axis
 deno task primitives --search robots    # substring over names and summaries
+deno task primitives --json             # machine-readable, same filters apply
 ```
 
 Run this before writing anything local. The failure it exists to prevent is

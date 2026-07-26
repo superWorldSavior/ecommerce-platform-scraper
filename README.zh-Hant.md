@@ -56,6 +56,8 @@ export const source = defineShoplineSource({
   productUrlRegex: /^https:\/\/shop\.example\.test\/products\/([^/?#]+)/u,
   // imageCandidateSelector omitted on purpose: omitting it takes the engine
   // default. Passing `null` would mean "deliberately no selection".
+  // Both projection providers null: no custom classification, no custom
+  // extractor — see "What you get out" for what they replace.
   projectionProviders: { artifactContext: null, structuredFacts: null },
   pipelineFns: { download: { siteUrl: "https://shop.example.test" } },
 });
@@ -87,9 +89,70 @@ if (!isDisallowed(rules, path)) {
 }
 ```
 
+## 你會得到什麼
+
+這件事值得把話說白，因為它決定了這套工具是不是你要的：**它不會把你的資料交給你，它交給你的是萃取資料所需要的上下文。**
+
+整條管線分成八個階段：
+
+```
+download → stage → reconcile → transcribe-html → transcribe-images
+         → apply-projections → score → project
+```
+
+每個來源會宣告自己支援哪些階段（`SourceModule.phases`；沒填就代表全部）。前五個屬於工具本身：抓取頁面、解析成記錄、去重，然後在文字與影像兩條路徑上做加值——OCR
+與視覺模型就落在這裡。`score` 與 `project` 是你的，工具對它們一無所知。
+
+交接發生在 `apply-projections`。`selectProjectionContext()` 回傳一個
+`ProjectionContext`：通過分類後留下來的頁面片段，每一段都標上*你*定義的
+role，另外附上「什麼被丟掉了」的帳目。
+
+```jsonc
+{
+  "projection": "specs",
+  "providerName": "per-artifact",
+  "artifacts": [
+    {
+      "id": "a3f",
+      "artifactKind": "image",
+      "sourceUrl": "https://img.shoplineapp.com/…/label-back.jpg",
+      "rawMarkdown": "| Vitamin C | 500 mg |\n| Zinc | 15 mg |",
+      "capturedAt": "2026-07-26T09:14:00.000Z"
+    }
+  ],
+  "classifiedArtifacts": [
+    { "roles": ["certificate"], "reason": "filename matched label pattern" }
+  ],
+  "stats": {
+    "selected": 1,
+    "dropped": 11,
+    "roles": { "certificate": 1, "promo": 6, "ui": 5 },
+    "charsBefore": 48000,
+    "charsAfter": 320
+  },
+  "fallbackReason": null
+}
+```
+
+`stats` 才是這件事的重點：48000 個字元的頁面，被縮到真正承載答案的那 320
+個。這就是你送進模型的東西，也是萃取成本只要幾分錢、而不是幾塊錢的原因。
+
+`fallbackReason`
+是誠實閥。`NO_PROVIDER`、`CLASSIFICATION_EMPTY`、`NO_SELECTED_ARTIFACTS` 與
+`PROVIDER_FALLBACK`
+都代表同一件事：「你拿到的是未經篩選的頁面」——降級了，但絕不無聲。
+
+**最後一步是你的**，而且是刻意如此。要把那份上下文變成有型別的物件，得帶著你自己的
+schema 去呼叫 LLM 客戶端；工具提供客戶端與路由，不提供 schema。在來源上宣告
+`structuredFacts`，就能用你自己的決定性萃取器取代那次模型呼叫——只要該網站的標記允許。
+
+所以誠實的總結是：它讓你從一個 URL 走到一份小而帶 role
+標記、可稽核的上下文，而且能套用在任意多個共用同一套引擎的網站上。那份上下文*代表什麼意思*仍然是你的問題——而這正是這套工具走得出它出生領域的原因。
+
 ## 新增一個來源
 
-三道命令，依序執行。每一道都回答了一個問題；少了它，下一道就只能靠你猜。
+三道命令，依序執行。每一道都回答了一個問題；少了它，下一道就只能靠你猜。改用程式代理來驅動這三道命令？同一套流程、寫給代理看的版本在
+[AGENTS.md](AGENTS.md)。
 
 ### 1. 看一眼真實頁面
 
@@ -114,6 +177,7 @@ JSON-LD
 deno task primitives                    # everything, grouped by axis
 deno task primitives --axis images      # one axis
 deno task primitives --search robots    # substring over names and summaries
+deno task primitives --json             # machine-readable, same filters apply
 ```
 
 在自己動手寫任何東西之前先跑這道命令。它存在的目的是防止這種失誤：重新實作一個早就存在的原語——而這種事之所以發生，是因為文件被一目十行地掃過去，不是因為誰真的做了這個決定。

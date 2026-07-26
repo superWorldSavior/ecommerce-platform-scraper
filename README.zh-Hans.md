@@ -8,7 +8,7 @@
 URL 形态、CDN
 规律、站点地图结构和图库标记都是相通的。本工具包把这套引擎当作复用单元：你声明某个站点跑在哪个平台上，继承该平台的默认值，只覆盖真正有差异的部分。
 
-它与业务领域无关。这里没有任何东西知道你在提取什么——角色词汇表、提取结构和输出模型全都由你定义。
+它**与业务领域无关**。这里没有任何东西知道你在提取什么——角色词汇表、提取结构和输出模型全都由你定义。
 
 ## 它为什么可能对你有用
 
@@ -27,31 +27,41 @@ URL 形态、CDN
 
 需要 [Deno](https://deno.com/) 2.x。
 
-```ts
-import {
-  defineShoplineSource,
-  PoliteFetcher,
-} from "jsr:@casys/ecommerce-platform-scraper";
+目前还没有发布到包仓库——请克隆下来，从源码导入：
+
+```bash
+git clone <this-repo> ecommerce-platform-scraper
+cd ecommerce-platform-scraper
+deno task check   # fmt, lint, type-check, tests
 ```
+
+```ts
+import { defineShoplineSource, PoliteFetcher } from "./src/mod.ts";
+```
+
+一旦发布，说明符就会变成
+`jsr:@casys/ecommerce-platform-scraper`；脚手架生成出来的已经是这种形式，可以用
+`--import` 覆盖。
 
 ## 快速开始
 
 在受支持的平台上声明一个来源：
 
 ```ts
-import { defineShoplineSource } from "./src/platforms/shopline.ts";
+import { defineShoplineSource } from "./src/mod.ts";
 
 export const source = defineShoplineSource({
   name: "example",
   rawHost: "shop.example.test",
   productUrlRegex: /^https:\/\/shop\.example\.test\/products\/([^/?#]+)/u,
-  imageCandidateSelector: null,
+  // imageCandidateSelector omitted on purpose: omitting it takes the engine
+  // default. Passing `null` would mean "deliberately no selection".
   projectionProviders: { artifactContext: null, structuredFacts: null },
   pipelineFns: { download: { siteUrl: "https://shop.example.test" } },
 });
 ```
 
-Shopline 的默认值——双 CDN 图像提示、OCR 前置的图像选择器、在 `/sitemap.xml`
+SHOPLINE 的默认值——双 CDN 图像提示、OCR 前置的图像选择器、在 `/sitemap.xml`
 上做站点地图发现——都已经填好。你写的覆盖值优先于默认值。
 
 礼貌地爬取，顺手把 `robots.txt` 也检查一下：
@@ -66,22 +76,69 @@ const fetcher = new PoliteFetcher({
   minIntervalMs: 1_000,
 });
 
-const rules = parseRobotsTxt(await (await fetch(robotsUrl)).text());
-if (!isDisallowed(rules, "/products/")) {
-  const page = await fetcher.fetchText(productUrl);
+// Same fetcher for robots.txt as for the pages: the courtesy applies to both.
+const rules = parseRobotsTxt(
+  await fetcher.fetchText("https://shop.example.test/robots.txt"),
+);
+
+const path = "/products/thing";
+if (!isDisallowed(rules, path)) {
+  const html = await fetcher.fetchText(`https://shop.example.test${path}`);
 }
 ```
 
-## 为新来源生成脚手架
+## 添加一个来源
 
-`deno task scaffold` 会问你几个问题，然后写出一份 `SourceModule`
-骨架——每个字段都在，并且逐个标注了本该放在那里的原语。
+三条命令，按顺序来。每一条都回答一个问题——否则下一条就得让你去猜。
+
+### 1. 看一眼真实的页面
+
+```
+deno task inspect https://shop.example.test/products/thing
+```
+
+它会报告页面实际包含什么：跑的是哪个电商引擎（从图像主机名看出来）、有没有
+Product JSON-LD
+块、商品路径的形态、懒加载图像的数量、看起来像法规标签的文件名。最后它会把这些观察结果所指向的
+`scaffold` 命令打印出来。
+
+它打印出来的每一项都是带明确理由的观察结果——绝不是猜测。如果某个信号不存在，它就说它不存在，而不是拿一个看似合理的默认值把它填上。传
+`--file page.html --url <url>` 可以分析你已经保存下来的页面，`--json`
+则输出机器可读的格式。
+
+在把某个提示定下来之前，先拿第二个商品页面确认一遍。一个页面还称不上一种规律。
+
+### 2. 问一问已经有什么
+
+```
+deno task primitives                    # everything, grouped by axis
+deno task primitives --axis images      # one axis
+deno task primitives --search robots    # substring over names and summaries
+```
+
+在动手写任何本地代码之前先跑这个。它要防的失败是：把一个本来就已经存在的原语重新实现一遍——这种事之所以发生，是因为文档被人一眼扫过，而不是因为谁真的决定这么干。
+
+有一个测试会断言：目录和公开导出描述的是完全相同的一组符号，所以只加导出而不把它登进目录，整套测试就会失败。正是这一点让这个答案值得信任。
+
+### 3. 生成骨架
+
+如果你信得过第 1 步查出来的东西，那就跳过复制粘贴——`inspect`
+可以直接把结果交接过去：
+
+```
+deno task inspect <url> --scaffold --name example --out sources/example/mod.ts
+```
+
+一条命令，从一个 URL 直接得到一份能编译通过的骨架。`--name`
+是它唯一不会替你臆造的东西：这个标识符由你自己定，从主机名猜出来的名字，你马上就会想改掉。
+
+想先过一遍答案，或者想在完全不做检查的情况下生成脚手架，就单独跑它。它会问你几个问题，然后写出同样的骨架——每个字段都在，并且逐个标注了本该放在那里的原语：
 
 ```
 deno task scaffold --out sources/example/mod.ts
 ```
 
-答案也可以用命令行标志传进去，所以同一条命令也能无人值守地跑起来：
+每个答案同时也是一个命令行标志，所以同一条命令放进脚本里也能无人值守地跑起来：
 
 ```
 deno task scaffold --yes --name example --host shop.example.test \
@@ -94,6 +151,10 @@ deno task scaffold --yes --name example --host shop.example.test \
 
 注意它和工厂函数的区别：脚手架生成的是代码，之后由你去改；而工厂函数藏起来的是你永远不用写的代码。对于没有共用引擎的站点，没有什么可藏的，所以骨架会把每一项都摆出来。它做不到的是猜出你那个站点的
 HTML 怎么产出一件商品——这部分仍然归你。
+
+生成出来的骨架在每个能力字段里都填着
+`null`，那是一个有效的答案，而不是占位符。**[选择原语](docs/choosing-primitives.md)**
+讲的就是怎么决定该往那里放什么，以及什么时候把 `null` 留着才是对的。
 
 ## 平台支持
 
@@ -112,14 +173,17 @@ HTML 怎么产出一件商品——这部分仍然归你。
 ## 架构
 
 ```
-kernel/          source contract, discovery, sitemap, HTTP, raw storage,
+src/
+  kernel/        source contract, discovery, sitemap, HTTP, raw storage,
                  image candidates, artifact context
-  llm/           multi-model client, text/vision routing, typed errors
-  ocr/           OcrProvider interface + Apple Vision implementation
-platforms/       shopline · bvshop · cyberbiz
-presets/         reusable strategies, named by shape not by site
-locales/         zh-TW OCR quality checks
-cli/             scaffold: renders a SourceModule skeleton
+    llm/         multi-model client, text/vision routing, typed errors
+    ocr/         OcrProvider interface + Apple Vision implementation
+  platforms/     shopline · bvshop · cyberbiz
+  presets/       reusable strategies, named by shape not by site
+  locales/       zh-TW OCR quality checks
+  cli/           inspect · primitives · scaffold
+docs/            choosing-primitives: filling in the skeleton
+tests/
 ```
 
 整个设计由两个想法支撑。
@@ -128,6 +192,8 @@ cli/             scaffold: renders a SourceModule skeleton
 说明它是干什么用的。抓保健品需要一个“营养标签”角色，抓电子元件需要“规格书”。所以内核负责分类、选择和回退，词汇表由你提供：
 
 ```ts
+import { BASE_ARTIFACT_ROLES, defineRoleVocabulary } from "./src/mod.ts";
+
 const vocabulary = defineRoleVocabulary({
   roles: [...BASE_ARTIFACT_ROLES, "datasheet"],
   preferences: { specs: ["html", "datasheet", "product-description"] },
@@ -141,8 +207,23 @@ const vocabulary = defineRoleVocabulary({
 
 ## 配置
 
-复制 `.env.example`。四个 LLM 变量全部必填——包括
-`LLM_BASE_URL`，它**故意不设默认值**：一个静默的兜底值可能把你的数据发给一个你从未选择的服务商。
+把 `.env.example` 复制成 `.env`。没有任何东西会替你加载它——请给 `deno run` 传
+`--env-file=.env`，或者自己把这些变量 export 出去——因为一个悄悄读取 dotenv
+文件的库，会让嵌入它的进程措手不及。
+
+有四个变量是必填的——`LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL`、`LLM_VISION_MODEL`——缺了其中任何一个，会在启动时就失败，而不是跑到一半才失败。`LLM_REQUEST_TIMEOUT_MS`
+是唯一可选的那个。
+
+**本地还是托管，代码都一样。** `LLM_BASE_URL` 指向任意 OpenAI 兼容
+API，所以本地运行时（`http://localhost:11434/v1`）、自建服务器、托管服务商，对工具包来说都是一回事。在它们之间迁移只需要改一个环境变量。
+
+**两个模型槽位，自动路由。** `LLM_MODEL` 负责文本，`LLM_VISION_MODEL`
+负责带图像的调用，客户端按一次调用里有没有图像在两者之间做选择。把它们分开，是为了改动其中一个不会悄悄影响另一个。
+
+两者都是在构造客户端时从环境里读取的，所以单个进程同一时间只跑一个服务商、一对模型。想并排跑两个服务商，或者按调用点各自挑一个更便宜的模型，就得把配置作为参数传进来，而不是从环境里读——在你围绕它做规划之前，这一点值得先知道。
+
+`LLM_BASE_URL`
+**故意不设默认值**。一个静默的回退值可能把你的数据发给一个你从未选择的服务商，那比第一次调用时收到一条错误信息更糟。
 
 ## 已知限制
 

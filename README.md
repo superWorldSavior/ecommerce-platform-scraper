@@ -346,7 +346,9 @@ Four variables are required — `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`,
 **Local or hosted, same code.** `LLM_BASE_URL` points at any OpenAI-compatible
 API, so a local runtime (`http://localhost:11434/v1`), a self-hosted server, or
 a hosted provider are all the same to the toolkit. Moving between them is one
-environment variable.
+environment variable. Against a local runtime that skips authentication,
+`LLM_API_KEY` must be set but does not need to be a real credential — a dummy
+value works.
 
 **Two model slots, routed automatically.** `LLM_MODEL` handles text,
 `LLM_VISION_MODEL` handles calls that carry an image, and the client picks

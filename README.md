@@ -95,7 +95,8 @@ if (!isDisallowed(rules, path)) {
 ## Adding a source
 
 Three commands, in order. Each one answers a question the next would otherwise
-make you guess.
+make you guess. Driving them from a coding agent instead? The same loop, written
+for one, is in [AGENTS.md](AGENTS.md).
 
 ### 1. Look at a real page
 

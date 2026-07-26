@@ -33,10 +33,41 @@ vocabulary, the extraction schema and the output model are all yours.
 
 Requires [Deno](https://deno.com/) 2.x.
 
-Not published to a registry yet — clone it and import from source:
+Not on a registry yet. Two ways in.
+
+**Straight from GitHub, no clone.** Deno imports over HTTPS. Pin a tag — `main`
+moves under you:
+
+```ts
+import { defineShoplineSource } from "https://raw.githubusercontent.com/Casys-AI/ecommerce-platform-scraper/v0.1.0/src/mod.ts";
+```
+
+One catch, and it bites late. The package resolves `zod`, `openai` and `@std/*`
+through its own import map, and an import map does not travel with a URL. Copy
+these into your `deno.json`:
+
+```json
+{
+  "imports": {
+    "@std/encoding": "jsr:@std/encoding@^1",
+    "@std/path": "jsr:@std/path@^1",
+    "@std/cli": "jsr:@std/cli@^1",
+    "zod": "npm:zod@^3.24.0",
+    "openai": "npm:openai@^4"
+  }
+}
+```
+
+Skip them and the OCR, image-fetch and LLM paths fail to resolve — but plain
+`deno check` stays silent, because it does not type-check remote modules.
+`deno check --all` catches it. Declaring a source and crawling politely work
+without them; everything downstream does not.
+
+**Cloned**, which you want for the three CLIs — `inspect`, `primitives` and
+`scaffold` are `deno task` entries and need the repo:
 
 ```bash
-git clone <this-repo> ecommerce-platform-scraper
+git clone https://github.com/Casys-AI/ecommerce-platform-scraper
 cd ecommerce-platform-scraper
 deno task check   # fmt, lint, type-check, tests
 ```

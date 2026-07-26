@@ -27,10 +27,40 @@ URL 形态、CDN
 
 需要 [Deno](https://deno.com/) 2.x。
 
-目前还没有发布到包仓库——请克隆下来，从源码导入：
+目前还没有发布到包仓库。有两种用法。
+
+**直接从 GitHub 导入，不用克隆。** Deno 支持通过 HTTPS 导入。请钉住一个
+tag——`main` 会在你脚下移动：
+
+```ts
+import { defineShoplineSource } from "https://raw.githubusercontent.com/Casys-AI/ecommerce-platform-scraper/v0.1.0/src/mod.ts";
+```
+
+有一个陷阱，而且它咬得很晚。本包的 `zod`、`openai` 和 `@std/*` 是靠它自己的
+import map 解析的，而 import map 不会跟着 URL 一起走。请把这几条复制到你的
+`deno.json` 里：
+
+```json
+{
+  "imports": {
+    "@std/encoding": "jsr:@std/encoding@^1",
+    "@std/path": "jsr:@std/path@^1",
+    "@std/cli": "jsr:@std/cli@^1",
+    "zod": "npm:zod@^3.24.0",
+    "openai": "npm:openai@^4"
+  }
+}
+```
+
+少了它们，OCR、图像抓取和 LLM 这几条路径会解析失败——但普通的 `deno check`
+不会吭声，因为它不对远程模块做类型检查，得用 `deno check --all`
+才能抓到。声明来源和礼貌爬取用不到这些条目，再往下的每一步都用得到。
+
+**克隆下来**，这是你想用那三个 CLI 时的选择——`inspect`、`primitives` 和
+`scaffold` 都是 `deno task` 条目，需要整个仓库：
 
 ```bash
-git clone <this-repo> ecommerce-platform-scraper
+git clone https://github.com/Casys-AI/ecommerce-platform-scraper
 cd ecommerce-platform-scraper
 deno task check   # fmt, lint, type-check, tests
 ```

@@ -37,7 +37,7 @@ HTML。只讀標記的爬蟲會把這些欄位留空，而且通常不會告訴�
 tag——`main` 會在你腳下移動：
 
 ```ts
-import { defineShoplineSource } from "https://raw.githubusercontent.com/Casys-AI/ecommerce-platform-scraper/v0.1.0/src/mod.ts";
+import { defineShoplineSource } from "https://raw.githubusercontent.com/superWorldSavior/ecommerce-platform-scraper/v0.1.0/src/mod.ts";
 ```
 
 有一個陷阱，而且它會很晚才咬你。本套件的 `zod`、`openai` 與 `@std/*`
@@ -64,7 +64,7 @@ import { defineShoplineSource } from "https://raw.githubusercontent.com/Casys-AI
 `scaffold` 都是 `deno task` 項目，需要整個 repo：
 
 ```bash
-git clone https://github.com/Casys-AI/ecommerce-platform-scraper
+git clone https://github.com/superWorldSavior/ecommerce-platform-scraper
 cd ecommerce-platform-scraper
 deno task check   # fmt, lint, type-check, tests
 ```

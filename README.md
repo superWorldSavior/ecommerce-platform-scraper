@@ -45,7 +45,7 @@ Not on a registry yet. Two ways in.
 moves under you:
 
 ```ts
-import { defineShoplineSource } from "https://raw.githubusercontent.com/Casys-AI/ecommerce-platform-scraper/v0.1.0/src/mod.ts";
+import { defineShoplineSource } from "https://raw.githubusercontent.com/superWorldSavior/ecommerce-platform-scraper/v0.1.0/src/mod.ts";
 ```
 
 One catch, and it bites late. The package resolves `zod`, `openai` and `@std/*`
@@ -73,7 +73,7 @@ without them; everything downstream does not.
 `scaffold` are `deno task` entries and need the repo:
 
 ```bash
-git clone https://github.com/Casys-AI/ecommerce-platform-scraper
+git clone https://github.com/superWorldSavior/ecommerce-platform-scraper
 cd ecommerce-platform-scraper
 deno task check   # fmt, lint, type-check, tests
 ```

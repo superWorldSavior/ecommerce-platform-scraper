@@ -37,7 +37,7 @@ HTML。只读标记的爬虫会把这些字段留空，而且通常不会告诉�
 tag——`main` 会在你脚下移动：
 
 ```ts
-import { defineShoplineSource } from "https://raw.githubusercontent.com/Casys-AI/ecommerce-platform-scraper/v0.1.0/src/mod.ts";
+import { defineShoplineSource } from "https://raw.githubusercontent.com/superWorldSavior/ecommerce-platform-scraper/v0.1.0/src/mod.ts";
 ```
 
 有一个陷阱，而且它咬得很晚。本包的 `zod`、`openai` 和 `@std/*` 是靠它自己的
@@ -64,7 +64,7 @@ import map 解析的，而 import map 不会跟着 URL 一起走。请把这几�
 `scaffold` 都是 `deno task` 条目，需要整个仓库：
 
 ```bash
-git clone https://github.com/Casys-AI/ecommerce-platform-scraper
+git clone https://github.com/superWorldSavior/ecommerce-platform-scraper
 cd ecommerce-platform-scraper
 deno task check   # fmt, lint, type-check, tests
 ```
